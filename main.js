@@ -74,34 +74,25 @@ function applyRetroFilter(file) {
       for (let i = 0; i < px.length; i += 4) {
         let r = px[i], g = px[i+1], b = px[i+2];
 
-        const gray = r * 0.299 + g * 0.587 + b * 0.114;
-        r = r * 0.15 + gray * 0.85;
-        g = g * 0.15 + gray * 0.85;
-        b = b * 0.15 + gray * 0.85;
+        // 완전 흑백
+        let v = px[i] * 0.299 + px[i+1] * 0.587 + px[i+2] * 0.114;
 
-        const sr = r * 0.393 + g * 0.769 + b * 0.189;
-        const sg = r * 0.349 + g * 0.686 + b * 0.168;
-        const sb = r * 0.272 + g * 0.534 + b * 0.131;
-        r = r * 0.88 + sr * 0.12;
-        g = g * 0.88 + sg * 0.12;
-        b = b * 0.88 + sb * 0.12;
+        // brightness 0.82 + contrast 1.5
+        v = (v * 0.82 - 128) * 1.5 + 128;
 
-        r = (r * 0.86 - 128) * 1.1 + 128;
-        g = (g * 0.86 - 128) * 1.1 + 128;
-        b = (b * 0.86 - 128) * 1.1 + 128;
-
+        // 비네팅
         const px_ = (i / 4) % w, py_ = Math.floor((i / 4) / w);
         const dx = px_ - cx, dy = py_ - cy;
         const dist = Math.sqrt(dx*dx + dy*dy) / maxDist;
-        const vig = dist > 0.4 ? (dist - 0.4) / 0.6 * 0.55 : 0;
-        r = r * (1 - vig);
-        g = g * (1 - vig);
-        b = b * (1 - vig);
+        const vig = dist > 0.35 ? (dist - 0.35) / 0.65 * 0.65 : 0;
+        v = v * (1 - vig);
 
-        const n = (Math.random() - 0.5) * 18;
-        px[i]   = Math.min(255, Math.max(0, r + n));
-        px[i+1] = Math.min(255, Math.max(0, g + n));
-        px[i+2] = Math.min(255, Math.max(0, b + n));
+        // 그레인
+        const n = (Math.random() - 0.5) * 22;
+        const out = Math.min(255, Math.max(0, v + n));
+        px[i]   = out;
+        px[i+1] = out;
+        px[i+2] = out;
       }
       ctx.putImageData(id, 0, 0);
       canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.88);
