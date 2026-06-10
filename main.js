@@ -5,26 +5,28 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const isAdmin = new URLSearchParams(location.search).has('admin');
 
 // ── DOM ──
-const adminPanel  = document.getElementById('adminPanel');
-const loginBox    = document.getElementById('loginBox');
-const writeBox    = document.getElementById('writeBox');
-const loginBtn    = document.getElementById('loginBtn');
-const logoutBtn   = document.getElementById('logoutBtn');
-const postBtn     = document.getElementById('postBtn');
-const loginStatus = document.getElementById('loginStatus');
-const postStatus  = document.getElementById('postStatus');
-const archiveList = document.getElementById('archiveList');
-const postPhoto   = document.getElementById('postPhoto');
-const postPreview = document.getElementById('postPreview');
-const postFileName= document.getElementById('postFileName');
-const postModal   = document.getElementById('postModal');
-const modalClose  = document.getElementById('modalClose');
-const modalImg    = document.getElementById('modalImg');
-const modalDate   = document.getElementById('modalDate');
-const modalTitle  = document.getElementById('modalTitle');
-const modalExcerpt= document.getElementById('modalExcerpt');
+const adminPanel      = document.getElementById('adminPanel');
+const loginBox        = document.getElementById('loginBox');
+const writeBox        = document.getElementById('writeBox');
+const loginBtn        = document.getElementById('loginBtn');
+const logoutBtn       = document.getElementById('logoutBtn');
+const postBtn         = document.getElementById('postBtn');
+const loginStatus     = document.getElementById('loginStatus');
+const postStatus      = document.getElementById('postStatus');
+const archiveList     = document.getElementById('archiveList');
+const postPhoto       = document.getElementById('postPhoto');
+const postFileName    = document.getElementById('postFileName');
+const postFilterStatus= document.getElementById('postFilterStatus');
+const multiPreview    = document.getElementById('multiPreview');
+const postModal       = document.getElementById('postModal');
+const modalClose      = document.getElementById('modalClose');
+const modalImages     = document.getElementById('modalImages');
+const modalDate       = document.getElementById('modalDate');
+const modalTitle      = document.getElementById('modalTitle');
+const modalExcerpt    = document.getElementById('modalExcerpt');
 
-let posts = []; // 현재 로드된 포스트 목록
+let posts        = [];
+let filteredBlobs = []; // canvas 처리된 blob 배열
 
 // ── Admin ──
 if (isAdmin) {
@@ -34,15 +36,71 @@ if (isAdmin) {
   });
 }
 
-postPhoto.addEventListener('change', () => {
-  const file = postPhoto.files[0];
-  if (!file) { postPreview.style.display = 'none'; postFileName.textContent = ''; return; }
-  postFileName.textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = e => { postPreview.src = e.target.result; postPreview.style.display = 'block'; };
-  reader.readAsDataURL(file);
+// ── Retro filter (same as weather.js) ──
+function applyRetroFilter(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1400;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > MAX || h > MAX) {
+        const r = Math.min(MAX / w, MAX / h);
+        w = Math.round(w * r); h = Math.round(h * r);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      ctx.filter = 'grayscale(85%) sepia(12%) brightness(0.86) contrast(1.1)';
+      ctx.drawImage(img, 0, 0, w, h);
+      ctx.filter = 'none';
+
+      const vig = ctx.createRadialGradient(w/2, h/2, h*0.22, w/2, h/2, h*0.82);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, 'rgba(0,0,0,0.42)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, w, h);
+
+      const id = ctx.getImageData(0, 0, w, h);
+      const px = id.data;
+      for (let i = 0; i < px.length; i += 4) {
+        const n = (Math.random() - 0.5) * 18;
+        px[i]   = Math.min(255, Math.max(0, px[i]   + n));
+        px[i+1] = Math.min(255, Math.max(0, px[i+1] + n));
+        px[i+2] = Math.min(255, Math.max(0, px[i+2] + n));
+      }
+      ctx.putImageData(id, 0, 0);
+
+      canvas.toBlob(blob => { URL.revokeObjectURL(img.src); resolve(blob); }, 'image/jpeg', 0.88);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// ── Multi photo preview ──
+postPhoto.addEventListener('change', async () => {
+  const files = Array.from(postPhoto.files);
+  filteredBlobs = [];
+  multiPreview.innerHTML = '';
+
+  if (!files.length) { postFileName.textContent = ''; postFilterStatus.textContent = ''; return; }
+
+  postFileName.textContent    = `${files.length}장 선택됨`;
+  postFilterStatus.textContent = '필터 적용 중—';
+
+  for (const file of files) {
+    const blob = await applyRetroFilter(file);
+    filteredBlobs.push(blob);
+    const img = document.createElement('img');
+    img.className = 'multi-thumb';
+    img.src = URL.createObjectURL(blob);
+    multiPreview.appendChild(img);
+  }
+
+  postFilterStatus.textContent = '';
 });
 
+// ── Login ──
 async function doLogin() {
   const email    = document.getElementById('adminEmail').value.trim();
   const password = document.getElementById('adminPassword').value;
@@ -74,27 +132,34 @@ postBtn.addEventListener('click', async () => {
   postBtn.disabled = true;
   postStatus.textContent = '—';
 
-  let image_url = null;
-  const file = postPhoto.files[0];
-  if (file) {
-    const ext  = file.name.split('.').pop();
-    const path = `archive/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const image_urls = [];
+  const blobs = filteredBlobs.length ? filteredBlobs : Array.from(postPhoto.files);
+
+  for (let i = 0; i < blobs.length; i++) {
+    const blob = blobs[i];
+    const path = `archive/${Date.now()}-${Math.random().toString(36).slice(2)}-${i}.jpg`;
     const { error: upErr } = await sb.storage
       .from('weather-photos')
-      .upload(path, file, { contentType: file.type });
+      .upload(path, blob, { contentType: 'image/jpeg' });
     if (upErr) {
-      postStatus.textContent = `사진 업로드 실패: ${upErr.message}`;
+      postStatus.textContent = `사진 업로드 실패 (${i+1}번): ${upErr.message}`;
       postBtn.disabled = false;
       return;
     }
-    image_url = sb.storage.from('weather-photos').getPublicUrl(path).data.publicUrl;
+    image_urls.push(sb.storage.from('weather-photos').getPublicUrl(path).data.publicUrl);
   }
 
-  // order_index: 현재 최솟값 - 1 (맨 앞에 삽입)
   const minOrder = posts.length ? Math.min(...posts.map(p => p.order_index ?? 0)) : 0;
 
-  const { error } = await sb.from('archive_posts')
-    .insert({ title, excerpt: excerpt || null, image_url, post_date: date || null, order_index: minOrder - 1 });
+  const { error } = await sb.from('archive_posts').insert({
+    title,
+    excerpt: excerpt || null,
+    image_url: image_urls[0] || null,   // 하위호환
+    image_urls: image_urls,
+    post_date: date || null,
+    order_index: minOrder - 1
+  });
+
   if (error) {
     postStatus.textContent = `저장 실패: ${error.message}`;
     postBtn.disabled = false;
@@ -104,8 +169,9 @@ postBtn.addEventListener('click', async () => {
   postStatus.textContent = '올라갔습니다.';
   ['postTitle','postExcerpt','postDate'].forEach(id => document.getElementById(id).value = '');
   postPhoto.value = '';
-  postPreview.style.display = 'none';
   postFileName.textContent = '';
+  filteredBlobs = [];
+  multiPreview.innerHTML = '';
   postBtn.disabled = false;
   await loadArchive();
 });
@@ -130,41 +196,32 @@ async function loadArchive() {
 
 function renderItem(post, i, total) {
   const meta = post.post_date || String(i + 1).padStart(2, '0');
-
   const adminControls = isAdmin ? `
     <span class="admin-controls">
       <button class="ctrl-btn move-up"   data-id="${escapeAttr(post.id)}" ${i === 0 ? 'disabled' : ''}>↑</button>
-      <button class="ctrl-btn move-down" data-id="${escapeAttr(post.id)}" ${i === total - 1 ? 'disabled' : ''}>↓</button>
+      <button class="ctrl-btn move-down" data-id="${escapeAttr(post.id)}" ${i === total-1 ? 'disabled' : ''}>↓</button>
       <button class="ctrl-btn delete-btn" data-id="${escapeAttr(post.id)}">삭제</button>
-    </span>
-  ` : '';
+    </span>` : '';
 
   return `
     <div class="list-item" data-id="${escapeAttr(post.id)}">
       <span class="list-item-meta">${escapeHtml(meta)}</span>
-      <span class="list-item-title">
-        ${escapeHtml(post.title)}
-        ${adminControls}
-      </span>
+      <span class="list-item-title">${escapeHtml(post.title)}${adminControls}</span>
       <span class="list-item-artist">suheeson</span>
-    </div>
-  `;
+    </div>`;
 }
 
 function bindItemEvents() {
-  // 클릭 → 모달
   archiveList.querySelectorAll('.list-item').forEach(el => {
     el.addEventListener('click', e => {
-      if (e.target.closest('.ctrl-btn')) return; // 컨트롤 버튼 클릭 제외
-      const id   = el.dataset.id;
-      const post = posts.find(p => p.id === id);
+      if (e.target.closest('.ctrl-btn')) return;
+      const post = posts.find(p => p.id === el.dataset.id);
       if (post) openModal(post);
     });
   });
 
   if (!isAdmin) return;
 
-  // 삭제
   archiveList.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
@@ -174,17 +231,15 @@ function bindItemEvents() {
     });
   });
 
-  // 순서 위로
   archiveList.querySelectorAll('.move-up').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
-      const idx  = posts.findIndex(p => p.id === btn.dataset.id);
+      const idx = posts.findIndex(p => p.id === btn.dataset.id);
       if (idx <= 0) return;
       await swapOrder(posts[idx], posts[idx - 1]);
     });
   });
 
-  // 순서 아래로
   archiveList.querySelectorAll('.move-down').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
@@ -204,13 +259,15 @@ async function swapOrder(a, b) {
 
 // ── Modal ──
 function openModal(post) {
-  if (post.image_url) {
-    modalImg.src = post.image_url;
-    modalImg.style.display = 'block';
-  } else {
-    modalImg.style.display = 'none';
-    modalImg.src = '';
-  }
+  // 이미지 목록: image_urls 배열 우선, 없으면 image_url 단일
+  const imgs = (post.image_urls && post.image_urls.length)
+    ? post.image_urls
+    : (post.image_url ? [post.image_url] : []);
+
+  modalImages.innerHTML = imgs.map(url =>
+    `<img class="modal-img" src="${escapeAttr(url)}" alt="" loading="lazy" />`
+  ).join('');
+
   modalDate.textContent    = post.post_date || '';
   modalTitle.textContent   = post.title;
   modalExcerpt.textContent = post.excerpt || '';
@@ -221,18 +278,13 @@ function openModal(post) {
 function closeModal() {
   postModal.classList.remove('open');
   document.body.style.overflow = '';
-  modalImg.src = '';
+  modalImages.innerHTML = '';
 }
 
 modalClose.addEventListener('click', closeModal);
-postModal.addEventListener('click', e => {
-  if (e.target === postModal) closeModal();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
+postModal.addEventListener('click', e => { if (e.target === postModal) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-// ── Helpers ──
 function showWriteBox() {
   loginBox.style.display = 'none';
   writeBox.style.display = 'block';
@@ -240,11 +292,11 @@ function showWriteBox() {
 
 function escapeHtml(str) {
   return String(str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escapeAttr(str) {
-  return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 loadArchive();

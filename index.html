@@ -10,7 +10,7 @@
 <body>
 
   <header class="site-header">
-    <div class="site-title">mikihoo / 微氣候</div>
+    <a href="index.html" class="site-title">mikihoo / 微氣候</a>
     <nav class="site-nav">
       <a href="index.html" class="active">아카이브</a>
       <a href="weather.html">당신의 날씨</a>
@@ -50,11 +50,12 @@
           <textarea id="postExcerpt" style="height:6rem;" maxlength="300"></textarea>
         </div>
         <div class="form-field">
-          <label>사진 (선택)</label>
+          <label>사진 (여러 장 선택 가능)</label>
           <label for="postPhoto" class="file-label">파일 선택 —</label>
-          <input type="file" id="postPhoto" accept="image/*" />
+          <input type="file" id="postPhoto" accept="image/*" multiple />
           <div class="file-name" id="postFileName"></div>
-          <img class="preview-img" id="postPreview" alt="" />
+          <div class="filter-status" id="postFilterStatus"></div>
+          <div class="multi-preview" id="multiPreview"></div>
         </div>
         <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
           <button class="btn-submit" id="postBtn">올리다</button>
@@ -73,13 +74,14 @@
 
   <footer class="site-footer">
     <span>mikihoo &copy; 2026</span>
+    <a href="index.html?admin" class="admin-entry">관리</a>
   </footer>
 
   <!-- 포스트 상세 모달 -->
   <div class="post-modal" id="postModal">
     <button class="modal-close" id="modalClose">×</button>
     <div class="modal-inner">
-      <img class="modal-img" id="modalImg" alt="" />
+      <div class="modal-images" id="modalImages"></div>
       <div class="modal-body">
         <div class="modal-date" id="modalDate"></div>
         <div class="modal-title" id="modalTitle"></div>
