@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>당신의 날씨 — mikihoo</title>
+  <meta name="description" content="오늘 당신 곁의 날씨를 남겨주세요." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="site-title">mikihoo / 미기후</div>
+    <nav class="site-nav">
+      <a href="index.html">아카이브</a>
+      <a href="weather.html" class="active">당신의 날씨</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <section class="weather-intro">
+      <h2>당신의 날씨</h2>
+      <p>
+        오늘 당신 곁에 어떤 날씨가 있었나요.<br />
+        이름 대신 아무 별명으로, 사진 한 장과 짧은 문장을 남겨주세요.
+      </p>
+    </section>
+
+    <form class="weather-form" id="weatherForm" novalidate>
+      <div class="form-field">
+        <label for="nickname">닉네임</label>
+        <input
+          type="text"
+          id="nickname"
+          name="nickname"
+          placeholder="아무 이름이어도 됩니다"
+          maxlength="30"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="message">오늘의 날씨</label>
+        <textarea
+          id="message"
+          name="message"
+          placeholder="한두 문장이면 충분합니다"
+          maxlength="200"
+        ></textarea>
+      </div>
+
+      <div class="form-field">
+        <label>사진 (선택)</label>
+        <label for="photo" class="file-label">파일 선택 —</label>
+        <input type="file" id="photo" name="photo" accept="image/*" />
+        <div class="file-name" id="fileName"></div>
+        <img class="preview-img" id="previewImg" alt="" />
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">남기다</button>
+      <div class="form-status" id="formStatus"></div>
+    </form>
+
+    <section class="entries-section">
+      <div class="entries-label">남겨진 날씨들</div>
+      <div id="entriesList">
+        <p class="entries-empty">아직 아무것도 없습니다.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <span>mikihoo &copy; 2026</span>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="weather.js"></script>
+</body>
+</html>
