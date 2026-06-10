@@ -33,14 +33,25 @@ postPhoto.addEventListener('change', () => {
   reader.readAsDataURL(file);
 });
 
-loginBtn.addEventListener('click', async () => {
+async function doLogin() {
   const email    = document.getElementById('adminEmail').value.trim();
   const password = document.getElementById('adminPassword').value;
+  if (!email || !password) return;
   loginBtn.disabled = true;
   loginStatus.textContent = '—';
   const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { loginStatus.textContent = error.message; loginBtn.disabled = false; return; }
+  if (error) {
+    loginStatus.textContent = error.message;
+    loginBtn.disabled = false;
+    return;
+  }
   showWriteBox();
+}
+
+loginBtn.addEventListener('click', doLogin);
+
+document.getElementById('adminPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
 });
 
 logoutBtn.addEventListener('click', async () => {

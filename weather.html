@@ -17,6 +17,9 @@
     </nav>
   </header>
 
+  <!-- 실시간 날씨 바 -->
+  <div class="weather-bar" id="weatherBar"></div>
+
   <main class="weather-main">
 
     <section class="weather-intro">
@@ -30,24 +33,14 @@
     <form class="weather-form" id="weatherForm" novalidate>
       <div class="form-field">
         <label for="nickname">닉네임</label>
-        <input
-          type="text"
-          id="nickname"
-          name="nickname"
-          placeholder="아무 이름이어도 됩니다"
-          maxlength="30"
-          autocomplete="off"
-        />
+        <input type="text" id="nickname" name="nickname"
+          placeholder="아무 이름이어도 됩니다" maxlength="30" autocomplete="off" />
       </div>
 
       <div class="form-field">
         <label for="message">오늘의 날씨</label>
-        <textarea
-          id="message"
-          name="message"
-          placeholder="한두 문장이면 충분합니다"
-          maxlength="200"
-        ></textarea>
+        <textarea id="message" name="message"
+          placeholder="한두 문장이면 충분합니다" maxlength="200"></textarea>
       </div>
 
       <div class="form-field">
@@ -55,6 +48,7 @@
         <label for="photo" class="file-label">파일 선택 —</label>
         <input type="file" id="photo" name="photo" accept="image/*" />
         <div class="file-name" id="fileName"></div>
+        <div class="filter-status" id="filterStatus"></div>
         <img class="preview-img" id="previewImg" alt="" />
       </div>
 
@@ -64,7 +58,7 @@
 
     <section class="entries-section">
       <div class="entries-label">남겨진 날씨들</div>
-      <div id="entriesList">
+      <div class="timeline" id="entriesList">
         <p class="entries-empty">아직 아무것도 없습니다.</p>
       </div>
     </section>
