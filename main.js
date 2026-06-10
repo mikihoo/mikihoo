@@ -31,17 +31,31 @@ let posts        = [];
 let filteredBlobs = [];
 let currentWeather = null;
 
-// 날씨 미리 가져오기 (글 작성 시 포함)
-if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(({ coords }) => {
-    fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.main) currentWeather = `${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`;
-      })
-      .catch(() => {});
-  }, () => {});
+// 날씨 가져오기 — 표시 + 글 작성 시 포함
+function setIndexWeather(text) {
+  currentWeather = text;
+  const bar = document.getElementById('indexWeatherBar');
+  if (bar) { bar.textContent = `지금 이곳 — ${text}`; bar.classList.add('visible'); }
 }
+
+async function initIndexWeather() {
+  const gps = await new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    const t = setTimeout(() => resolve(null), 5000);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => { clearTimeout(t); resolve(coords); },
+      ()           => { clearTimeout(t); resolve(null); }
+    );
+  });
+  try {
+    const coords = gps || await fetch('https://ipinfo.io/json').then(r => r.json()).then(d => {
+      const [lat, lon] = d.loc.split(',').map(Number); return { latitude: lat, longitude: lon };
+    });
+    const d = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`).then(r => r.json());
+    if (d.main) setIndexWeather(`${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`);
+  } catch (_) {}
+}
+initIndexWeather();
 
 // ── Admin ──
 if (isAdmin) {
