@@ -26,6 +26,18 @@ let activeTab      = 'photo'; // 'photo' | 'draw'
 let currentWeather = null;
 let entriesMap     = {};
 
+// 페이지 로드마다 결정되는 드로잉 선 색조 (warm / cool 랜덤)
+const STROKE_TONE = (function () {
+  const t = Math.random();
+  if (Math.random() > 0.5) {
+    // warm: #ede8de → #d4c9b0
+    return [ Math.round(237 - t * 25), Math.round(232 - t * 31), Math.round(222 - t * 46) ];
+  } else {
+    // cool: #dde3e8 → #c8d4db
+    return [ Math.round(221 - t * 21), Math.round(227 - t * 15), Math.round(232 - t * 13) ];
+  }
+})();
+
 // ══════════════════════════════════════
 // 1. 글감 placeholder 로테이션
 // ══════════════════════════════════════
@@ -182,49 +194,82 @@ clearCanvasBtn && clearCanvasBtn.addEventListener('click', () => {
 // 드로잉 → 필터 적용 blob
 function applyFilterToDrawing() {
   return new Promise(resolve => {
-    const src = drawCanvas;
-    const w = src.width, h = src.height;
+    const w = drawCanvas.width, h = drawCanvas.height;
     const out = document.createElement('canvas');
     out.width = w; out.height = h;
     const ctx = out.getContext('2d');
-    ctx.drawImage(src, 0, 0);
 
+    // ── 1. 배경: #0f0f0f + 그레인 텍스처 (opacity 0.12) ──
+    ctx.fillStyle = '#0f0f0f';
+    ctx.fillRect(0, 0, w, h);
+
+    const bg = document.createElement('canvas');
+    bg.width = bg.height = 200;
+    const bctx = bg.getContext('2d');
+    const bid  = bctx.createImageData(200, 200);
+    for (let i = 0; i < bid.data.length; i += 4) {
+      const v = Math.random() * 255 | 0;
+      bid.data[i] = bid.data[i+1] = bid.data[i+2] = v;
+      bid.data[i+3] = 255;
+    }
+    bctx.putImageData(bid, 0, 0);
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle   = ctx.createPattern(bg, 'repeat');
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+
+    // ── 2. 드로잉 픽셀 합성 + 선 색상 재적용 + 비네팅 ──
+    ctx.drawImage(drawCanvas, 0, 0);
     const id = ctx.getImageData(0, 0, w, h);
     const px = id.data;
     const cx = w / 2, cy = h / 2;
-    const maxDist = Math.sqrt(cx * cx + cy * cy);
+    const [sr, sg, sb_] = STROKE_TONE;
+    const SQRT2 = Math.sqrt(2);
 
     for (let i = 0; i < px.length; i += 4) {
-      let v = px[i] * 0.299 + px[i+1] * 0.587 + px[i+2] * 0.114;
-      v = (v * 0.82 - 128) * 1.5 + 128;
+      const lum = px[i] * 0.299 + px[i+1] * 0.587 + px[i+2] * 0.114;
+
+      // 선 픽셀 판별 (배경 #0f0f0f = lum≈15)
+      if (lum > 30) {
+        // 선 색상 재적용: 원본 밝기를 STROKE_TONE으로 매핑
+        const t = lum / 255;
+        px[i]   = Math.round(sr * t);
+        px[i+1] = Math.round(sg * t);
+        px[i+2] = Math.round(sb_ * t);
+      }
+
+      // 타원형 비네팅
       const px_ = (i / 4) % w, py_ = Math.floor((i / 4) / w);
-      const dx  = px_ - cx, dy = py_ - cy;
-      const dist = Math.sqrt(dx*dx + dy*dy) / maxDist;
-      const vig  = dist > 0.35 ? (dist - 0.35) / 0.65 * 0.65 : 0;
-      v = v * (1 - vig);
-      const n = (Math.random() - 0.5) * 22;
-      const out_ = Math.min(255, Math.max(0, v + n));
-      px[i] = px[i+1] = px[i+2] = out_;
+      const dx  = (px_ - cx) / cx;   // normalize to [-1, 1]
+      const dy  = (py_ - cy) / cy;
+      const ed  = Math.sqrt(dx * dx + dy * dy); // 0=center, 1=edge, √2=corner
+      const vigAlpha = ed < 0.3
+        ? 0
+        : Math.min(0.85, (ed - 0.3) / (SQRT2 - 0.3) * 0.85);
+
+      px[i]   = Math.round(px[i]   * (1 - vigAlpha));
+      px[i+1] = Math.round(px[i+1] * (1 - vigAlpha));
+      px[i+2] = Math.round(px[i+2] * (1 - vigAlpha));
     }
     ctx.putImageData(id, 0, 0);
 
-    // 그레인 오버레이 0.06
+    // ── 3. 그레인 오버레이 (opacity 0.10) ──
     const gc = document.createElement('canvas');
-    gc.width = gc.height = 128;
+    gc.width = gc.height = 200;
     const gctx = gc.getContext('2d');
-    const gid  = gctx.createImageData(128, 128);
+    const gid  = gctx.createImageData(200, 200);
     for (let i = 0; i < gid.data.length; i += 4) {
       const v = Math.random() * 255 | 0;
       gid.data[i] = gid.data[i+1] = gid.data[i+2] = v;
       gid.data[i+3] = 255;
     }
     gctx.putImageData(gid, 0, 0);
-    ctx.globalAlpha = 0.06;
+    ctx.globalAlpha = 0.10;
     ctx.fillStyle   = ctx.createPattern(gc, 'repeat');
     ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = 1;
 
-    out.toBlob(blob => resolve(blob), 'image/jpeg', 0.88);
+    out.toBlob(blob => resolve(blob), 'image/jpeg', 0.90);
   });
 }
 
