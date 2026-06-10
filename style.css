@@ -18,7 +18,7 @@
   --hover-bg: #191917;
 }
 
-html { font-size: 15px; scroll-behavior: smooth; }
+html { font-size: 15px; }
 
 body {
   background: var(--bg);
