@@ -7,19 +7,19 @@
 }
 
 :root {
-  --bg: #111110;
-  --bg-alt: #171714;
-  --text: #e8e4dc;
-  --text-dim: #9a9690;
-  --text-faint: #5a5752;
-  --accent: #b8935a;
-  --accent-dim: #7a6040;
-  --border: #2a2924;
-  --max-w: 540px;
+  --bg: #0f0f0f;
+  --bg-alt: #161613;
+  --text: #e0dbd2;
+  --text-dim: #8a8680;
+  --text-faint: #4a4742;
+  --accent: #c4956a;
+  --accent-dim: #7a5c38;
+  --border: #252320;
+  --max-w: 480px;
 }
 
 html {
-  font-size: 15px;
+  font-size: 14px;
   scroll-behavior: smooth;
 }
 
@@ -28,7 +28,7 @@ body {
   color: var(--text);
   font-family: 'Noto Serif KR', 'EB Garamond', Georgia, serif;
   font-weight: 300;
-  line-height: 1.85;
+  line-height: 1.9;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
@@ -42,7 +42,7 @@ h1, h2, h3 {
 }
 
 p {
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   color: var(--text-dim);
   line-height: 2;
 }
@@ -55,28 +55,30 @@ a {
 /* ── Site Header ── */
 
 .site-header {
-  padding: 3rem 2rem 1.5rem;
+  padding: 3.5rem 2.4rem 2rem;
   max-width: var(--max-w);
 }
 
 .site-title {
-  font-size: 1rem;
-  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
   color: var(--text-faint);
   text-transform: lowercase;
+  font-family: 'EB Garamond', serif;
 }
 
 .site-nav {
-  margin-top: 0.6rem;
+  margin-top: 0.8rem;
   display: flex;
   gap: 2rem;
 }
 
 .site-nav a {
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
   color: var(--text-faint);
-  transition: color 0.6s ease;
+  text-transform: lowercase;
+  transition: color 0.7s ease;
 }
 
 .site-nav a:hover,
@@ -87,135 +89,139 @@ a {
 /* ── Main Layout ── */
 
 main {
-  padding: 0 2rem 8rem;
+  padding: 0 2.4rem 10rem;
   max-width: var(--max-w);
 }
 
 section {
-  margin-top: 5rem;
+  margin-top: 6rem;
 }
 
 /* ── Index: Essay ── */
 
 .essay-date {
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
   color: var(--text-faint);
-  margin-bottom: 2.4rem;
+  opacity: 0.3;
+  margin-bottom: 2.8rem;
   font-family: 'EB Garamond', serif;
   font-style: italic;
 }
 
-.essay-body p {
-  margin-bottom: 1.6rem;
-  font-size: 0.88rem;
+.essay-body {
+  border-top: 1px solid var(--border);
+  padding-top: 2.4rem;
 }
 
-.essay-body p:first-child::first-letter {
-  font-size: 2.2rem;
-  line-height: 1;
-  float: left;
-  margin-right: 0.15em;
-  color: var(--accent);
-  font-family: 'EB Garamond', serif;
+.essay-body p {
+  margin-bottom: 1.8rem;
+  font-size: 0.86rem;
+  line-height: 2.1;
 }
 
 /* ── Index: Archive ── */
 
 .archive-label {
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
   color: var(--text-faint);
   text-transform: lowercase;
-  border-bottom: 1px solid var(--border);
   padding-bottom: 0.8rem;
-  margin-bottom: 3rem;
+  margin-bottom: 4rem;
+  border-bottom: 1px solid var(--border);
+  font-family: 'EB Garamond', serif;
 }
 
 .archive-item {
-  margin-bottom: 4.5rem;
+  margin-bottom: 5rem;
 }
 
 .archive-item img {
-  width: 100%;
   display: block;
-  filter: saturate(0.6) brightness(0.88) contrast(1.05);
-  transition: filter 0.8s ease;
+  width: 100%;
+  filter: saturate(0.5) brightness(0.82) contrast(1.08);
+  transition: filter 0.9s ease;
 }
 
 .archive-item img:hover {
-  filter: saturate(0.75) brightness(0.92) contrast(1.02);
+  filter: saturate(0.65) brightness(0.88) contrast(1.05);
 }
 
-.archive-item.offset-right {
-  margin-left: 3rem;
-  width: calc(100% - 3rem);
-}
+/* irregular grid variants */
+.archive-item.w-55 { width: 55%; }
+.archive-item.w-70 { width: 70%; }
+.archive-item.w-85 { width: 85%; }
+.archive-item.w-full { width: 100%; }
 
-.archive-item.offset-right img {
-  width: 100%;
-}
-
-.archive-item.narrow {
-  width: 62%;
-}
+.archive-item.push-right { margin-left: auto; }
+.archive-item.push-mid   { margin-left: 15%; }
+.archive-item.push-sm    { margin-left: 8%; }
 
 .archive-caption {
-  margin-top: 0.9rem;
-  font-size: 0.76rem;
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-faint);
   font-style: italic;
   font-family: 'EB Garamond', serif;
   line-height: 1.6;
+  opacity: 0.55;
 }
 
 .archive-text {
-  margin-top: 3.5rem;
-  padding-left: 1.4rem;
+  margin: 4.5rem 0;
+  padding-left: 1.2rem;
   border-left: 1px solid var(--accent-dim);
 }
 
 .archive-text p {
-  font-size: 0.85rem;
+  font-size: 0.83rem;
+  line-height: 2.1;
+  color: var(--text-dim);
 }
 
 /* ── Weather Page ── */
 
 .weather-intro {
-  margin-bottom: 4rem;
+  margin-bottom: 4.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 2.8rem;
 }
 
 .weather-intro h2 {
-  font-size: 1rem;
-  letter-spacing: 0.04em;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
   color: var(--text);
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.4rem;
+  font-weight: 400;
 }
 
 .weather-intro p {
   font-size: 0.82rem;
+  line-height: 2;
 }
 
 /* ── Form ── */
 
 .weather-form {
-  margin-bottom: 5rem;
-  padding: 2rem 0;
+  margin-bottom: 6rem;
+  padding: 2.4rem 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
 
 .form-field {
-  margin-bottom: 1.6rem;
+  margin-bottom: 2rem;
 }
 
 .form-field label {
   display: block;
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
   color: var(--text-faint);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
   text-transform: lowercase;
+  font-family: 'EB Garamond', serif;
 }
 
 .form-field input[type="text"],
@@ -226,13 +232,14 @@ section {
   border-bottom: 1px solid var(--border);
   color: var(--text);
   font-family: 'Noto Serif KR', 'EB Garamond', serif;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 300;
-  padding: 0.4rem 0;
+  padding: 0.5rem 0;
   outline: none;
-  transition: border-color 0.6s ease;
+  transition: border-color 0.7s ease;
   -webkit-appearance: none;
   border-radius: 0;
+  line-height: 1.9;
 }
 
 .form-field input[type="text"]:focus,
@@ -242,8 +249,8 @@ section {
 
 .form-field textarea {
   resize: none;
-  height: 5rem;
-  line-height: 1.8;
+  height: 5.5rem;
+  line-height: 1.9;
 }
 
 .form-field input[type="file"] {
@@ -252,13 +259,14 @@ section {
 
 .file-label {
   display: inline-block;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
   color: var(--text-faint);
   cursor: pointer;
-  border-bottom: 1px solid var(--border);
   padding-bottom: 0.2rem;
-  transition: color 0.6s ease, border-color 0.6s ease;
+  border-bottom: 1px solid var(--border);
+  transition: color 0.7s ease, border-color 0.7s ease;
+  font-family: 'EB Garamond', serif;
 }
 
 .file-label:hover {
@@ -267,16 +275,17 @@ section {
 }
 
 .file-name {
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   color: var(--text-faint);
-  margin-top: 0.4rem;
+  margin-top: 0.5rem;
   font-style: italic;
+  opacity: 0.6;
 }
 
 .preview-img {
-  margin-top: 0.8rem;
-  max-width: 160px;
-  filter: saturate(0.5) brightness(0.85);
+  margin-top: 1rem;
+  max-width: 150px;
+  filter: saturate(0.45) brightness(0.82);
   display: none;
 }
 
@@ -285,12 +294,12 @@ section {
   border: 1px solid var(--accent-dim);
   color: var(--accent);
   font-family: 'EB Garamond', serif;
-  font-size: 0.82rem;
-  letter-spacing: 0.14em;
-  padding: 0.55rem 1.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  padding: 0.55rem 1.5rem;
   cursor: pointer;
-  transition: background 0.7s ease, color 0.7s ease;
-  margin-top: 0.6rem;
+  transition: background 0.8s ease, color 0.8s ease;
+  margin-top: 0.8rem;
 }
 
 .btn-submit:hover {
@@ -299,44 +308,46 @@ section {
 }
 
 .btn-submit:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: default;
 }
 
 .form-status {
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   color: var(--text-faint);
-  margin-top: 0.8rem;
+  margin-top: 0.9rem;
   font-style: italic;
   min-height: 1.2em;
+  font-family: 'EB Garamond', serif;
 }
 
 /* ── Weather Entries ── */
 
 .entries-label {
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
   color: var(--text-faint);
   text-transform: lowercase;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0.8rem;
-  margin-bottom: 3.5rem;
+  margin-bottom: 4rem;
+  font-family: 'EB Garamond', serif;
 }
 
 .entry {
-  margin-bottom: 4rem;
+  margin-bottom: 4.5rem;
   position: relative;
 }
 
 .entry-photo {
   width: 100%;
   display: block;
-  filter: saturate(0.55) brightness(0.85) contrast(1.08);
-  transition: filter 0.8s ease;
+  filter: saturate(0.5) brightness(0.82) contrast(1.08);
+  transition: filter 0.9s ease;
 }
 
 .entry-photo:hover {
-  filter: saturate(0.7) brightness(0.9) contrast(1.05);
+  filter: saturate(0.65) brightness(0.88) contrast(1.05);
 }
 
 .entry.has-photo .entry-meta {
@@ -346,45 +357,50 @@ section {
 .entry-meta {
   display: flex;
   align-items: baseline;
-  gap: 1.2rem;
+  gap: 1.4rem;
 }
 
 .entry-nickname {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--accent);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .entry-date {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--text-faint);
   font-family: 'EB Garamond', serif;
   font-style: italic;
+  opacity: 0.5;
 }
 
 .entry-message {
-  margin-top: 0.5rem;
-  font-size: 0.84rem;
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
   color: var(--text-dim);
-  line-height: 1.9;
+  line-height: 2;
   white-space: pre-wrap;
 }
 
 .entries-empty {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-faint);
   font-style: italic;
+  font-family: 'EB Garamond', serif;
+  opacity: 0.5;
 }
 
 /* ── Footer ── */
 
 footer {
-  padding: 2rem;
+  padding: 2rem 2.4rem;
   max-width: var(--max-w);
   border-top: 1px solid var(--border);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: var(--text-faint);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
+  font-family: 'EB Garamond', serif;
+  opacity: 0.4;
 }
 
 /* ── Grain overlay ── */
@@ -395,23 +411,15 @@ body::after {
   inset: 0;
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-  opacity: 0.18;
+  opacity: 0.22;
   z-index: 9999;
 }
 
 /* ── Scrollbar ── */
 
-::-webkit-scrollbar {
-  width: 3px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-}
+::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); }
 
 /* ── Selection ── */
 
