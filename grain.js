@@ -6,13 +6,11 @@
     'width:100%', 'height:100%',
     'pointer-events:none',
     'z-index:50',
-    'opacity:0',
-    'mix-blend-mode:screen'
+    'opacity:0'
   ].join(';');
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d');
 
-  // Small tile reused for perf
   const TILE = 200;
   const offscreen = document.createElement('canvas');
   offscreen.width = offscreen.height = TILE;
@@ -37,43 +35,54 @@
   }
 
   // ── Opacity state ──
-  const BASE   = 0.035;
-  const SCROLL_MAX = 0.06;
-  let displayOpacity = 0;   // what canvas sees
+  const BASE       = 0.018;   // 절반으로 줄임
+  const SCROLL_MAX = 0.03;
+  let displayOpacity = 0;
   let scrollTarget   = BASE;
   let fadeStart      = null;
   const FADE_MS      = 2000;
 
-  // ease-in quad
   function easeIn(t) { return t * t; }
 
-  // ── Scroll ──
+  // ── Scroll handler (window + weather col elements) ──
   let scrollTimer = null;
   function onScroll() {
     const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
-    const frac = Math.min(window.scrollY / maxScroll, 1);
+    const frac = maxScroll > 10
+      ? Math.min(window.scrollY / maxScroll, 1)
+      : 0.5; // 컬럼 내부 스크롤 시 중간값 사용
     scrollTarget = BASE + frac * (SCROLL_MAX - BASE);
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => { scrollTarget = BASE; }, 150);
   }
-  window.addEventListener('scroll',     onScroll, { passive: true });
-  window.addEventListener('touchmove',  onScroll, { passive: true });
+
+  function onColScroll() {
+    scrollTarget = SCROLL_MAX;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => { scrollTarget = BASE; }, 150);
+  }
+
+  window.addEventListener('scroll',    onScroll, { passive: true });
+  window.addEventListener('touchmove', onScroll, { passive: true });
+
+  // weather 페이지 컬럼 스크롤 연동
+  window.addEventListener('load', () => {
+    const cols = document.querySelectorAll('.weather-col-left, .weather-col-right');
+    cols.forEach(el => el.addEventListener('scroll', onColScroll, { passive: true }));
+  });
 
   // ── RAF loop ──
   let frame = 0;
   function tick(ts) {
     requestAnimationFrame(tick);
 
-    // Fade-in on load
     if (fadeStart === null) fadeStart = ts;
     const t = Math.min((ts - fadeStart) / FADE_MS, 1);
     const fadeFactor = easeIn(t);
 
-    // Smooth lerp toward scrollTarget (≈1.5s settling)
     displayOpacity += (scrollTarget - displayOpacity) * 0.012;
     canvas.style.opacity = fadeFactor * displayOpacity;
 
-    // Redraw noise every other frame
     frame++;
     if (frame % 2 === 0) {
       drawNoise();
@@ -89,10 +98,10 @@
     const el = document.createElement('div');
     el.style.cssText = [
       'position:fixed',
-      `left:${x - 30}px`,
-      `top:${y - 30}px`,
-      'width:60px',
-      'height:60px',
+      `left:${x - 15}px`,   // 30px 원 (절반)
+      `top:${y - 15}px`,
+      'width:30px',
+      'height:30px',
       'border-radius:50%',
       'background:rgba(168,168,158,0.15)',
       'pointer-events:none',
