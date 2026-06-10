@@ -41,10 +41,8 @@ function setWeatherText(text) {
 
 async function fetchWeatherByCoords(lat, lon) {
   const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OW_KEY}&units=metric&lang=kr`;
-  console.log('[weather] fetching:', url);
   const res = await fetch(url);
   const d = await res.json();
-  console.log('[weather] response:', res.status, d);
   if (!res.ok) throw new Error(d.message || res.statusText);
   const temp = Math.round(d.main.temp);
   const hum  = d.main.humidity;
@@ -52,15 +50,33 @@ async function fetchWeatherByCoords(lat, lon) {
   setWeatherText(`${temp}°C · ${hum}% · ${desc}`);
 }
 
-function initWeather() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(
-    ({ coords }) => {
-      fetchWeatherByCoords(coords.latitude, coords.longitude)
-        .catch(err => console.warn('[weather] API error:', err.message));
-    },
-    err => console.log('[weather] geolocation error:', err.code, err.message)
-  );
+async function getCoordsByIP() {
+  const res = await fetch('https://ipwho.is/');
+  const d = await res.json();
+  if (!d.success) throw new Error('ip lookup failed');
+  return { latitude: d.latitude, longitude: d.longitude };
+}
+
+async function initWeather() {
+  if (weatherNow) weatherNow.textContent = '—';
+
+  // GPS 시도 (5초 타임아웃)
+  const gpsCoords = await new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    const timer = setTimeout(() => resolve(null), 5000);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => { clearTimeout(timer); resolve(coords); },
+      ()           => { clearTimeout(timer); resolve(null); }
+    );
+  });
+
+  try {
+    const coords = gpsCoords || await getCoordsByIP();
+    await fetchWeatherByCoords(coords.latitude, coords.longitude);
+  } catch (err) {
+    console.warn('[weather] failed:', err.message);
+    if (weatherNow) weatherNow.textContent = '';
+  }
 }
 
 // ══════════════════════════════════════
