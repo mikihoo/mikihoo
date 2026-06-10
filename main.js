@@ -32,10 +32,18 @@ let filteredBlobs = [];
 let currentWeather = null;
 
 // 날씨 가져오기 — 표시 + 글 작성 시 포함
-function setIndexWeather(text) {
+function setIndexWeather(text, iconCode) {
   currentWeather = text;
+  const iconHtml = iconCode
+    ? `<img class="weather-icon" src="https://openweathermap.org/img/wn/${iconCode}@2x.png" alt="" />`
+    : '';
   const bar = document.getElementById('indexWeatherBar');
-  if (bar) { bar.textContent = `지금 이곳 — ${text}`; bar.classList.add('visible'); }
+  if (bar) {
+    bar.innerHTML = `${iconHtml}<span>지금 이곳 — ${escapeHtml(text)}</span>`;
+    bar.classList.add('visible');
+  }
+  const preview = document.getElementById('adminWeatherPreview');
+  if (preview) preview.innerHTML = `${iconHtml}<span>${escapeHtml(text)}</span>`;
 }
 
 async function initIndexWeather() {
@@ -52,7 +60,7 @@ async function initIndexWeather() {
       const [lat, lon] = d.loc.split(',').map(Number); return { latitude: lat, longitude: lon };
     });
     const d = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`).then(r => r.json());
-    if (d.main) setIndexWeather(`${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`);
+    if (d.main) setIndexWeather(`${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`, d.weather[0].icon);
   } catch (_) {}
 }
 initIndexWeather();

@@ -24,6 +24,7 @@ let filteredBlob   = null;
 let drawingBlob    = null; // blob from drawing canvas
 let activeTab      = 'photo'; // 'photo' | 'draw'
 let currentWeather = null;
+let currentPrompt  = null;
 let entriesMap     = {};
 
 // 페이지 로드마다 결정되는 드로잉 선 색조 (warm / cool 랜덤)
@@ -70,7 +71,8 @@ const PROMPTS = [
   let idx;
   do { idx = Math.floor(Math.random() * PROMPTS.length); } while (idx === lastIdx);
   sessionStorage.setItem('last_prompt', idx);
-  if (msgInput) msgInput.placeholder = PROMPTS[idx];
+  currentPrompt = PROMPTS[idx];
+  if (msgInput) msgInput.placeholder = currentPrompt;
 })();
 
 // ══════════════════════════════════════
@@ -291,11 +293,14 @@ function applyFilterToDrawing() {
 // 3. 실시간 날씨
 // ══════════════════════════════════════
 
-function setWeatherText(text) {
+function setWeatherText(text, iconCode) {
   currentWeather = text;
-  if (weatherNow) weatherNow.textContent = text;
+  const iconHtml = iconCode
+    ? `<img class="weather-icon" src="https://openweathermap.org/img/wn/${iconCode}@2x.png" alt="" />`
+    : '';
+  if (weatherNow) weatherNow.innerHTML = `${iconHtml}<span>${escapeHtml(text)}</span>`;
   if (weatherBar) {
-    weatherBar.textContent = `지금 이곳 — ${text}`;
+    weatherBar.innerHTML = `${iconHtml}<span>지금 이곳 — ${escapeHtml(text)}</span>`;
     weatherBar.classList.add('visible');
   }
 }
@@ -305,7 +310,10 @@ async function fetchWeatherByCoords(lat, lon) {
   const res = await fetch(url);
   const d = await res.json();
   if (!res.ok) throw new Error(d.message || res.statusText);
-  setWeatherText(`${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`);
+  setWeatherText(
+    `${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`,
+    d.weather[0].icon
+  );
 }
 
 async function getCoordsByIP() {
@@ -447,7 +455,7 @@ form.addEventListener('submit', async (e) => {
 
   const { error: insertError } = await sb
     .from('guestbook')
-    .insert({ nickname, message, image_url, weather_text: currentWeather || null });
+    .insert({ nickname, message, image_url, weather_text: currentWeather || null, prompt_text: currentPrompt || null });
 
   if (insertError) {
     statusEl.textContent = `저장 실패: ${insertError.message}`;
@@ -546,6 +554,9 @@ function renderTimelineItem(entry) {
   const weatherHtml = entry.weather_text
     ? `<span class="tl-weather">${escapeHtml(entry.weather_text)}</span>`
     : '';
+  const promptHtml = entry.prompt_text
+    ? `<span class="tl-prompt">${escapeHtml(entry.prompt_text)}</span>`
+    : '';
 
   return `
     <div class="tl-item ${entry.image_url ? 'has-photo' : ''}" data-id="${escapeAttr(entry.id)}">
@@ -556,6 +567,7 @@ function renderTimelineItem(entry) {
       <div class="tl-right">
         <span class="tl-nickname">${escapeHtml(entry.nickname)}</span>
         ${weatherHtml}
+        ${promptHtml}
         ${imgHtml}
         <p class="tl-message">${escapeHtml(entry.message)}</p>
       </div>
