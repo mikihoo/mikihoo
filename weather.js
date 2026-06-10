@@ -269,6 +269,8 @@ function bindDeleteEvents() {
   listEl.querySelectorAll('.tl-delete').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { alert('로그인이 필요합니다.'); return; }
       if (!confirm('삭제할까요?')) return;
       const { error } = await sb.from('guestbook').delete().eq('id', btn.dataset.id);
       if (error) { alert('삭제 실패: ' + error.message); return; }
@@ -294,14 +296,43 @@ function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// ── init ──
+// ── Admin login ──
+const weatherAdminLogin = document.getElementById('weatherAdminLogin');
+const wLoginBtn         = document.getElementById('wLoginBtn');
+const wLoginStatus      = document.getElementById('wLoginStatus');
+
 if (isAdmin) {
-  const label = document.createElement('div');
-  label.style.cssText = 'font-size:0.62rem;letter-spacing:0.12em;color:var(--accent-dim);font-family:"EB Garamond",serif;margin-bottom:1rem;opacity:0.7;';
-  label.textContent = '관리자 모드 — 각 항목에 삭제 버튼이 표시됩니다';
-  const entriesSection = document.querySelector('.entries-section');
-  if (entriesSection) entriesSection.insertBefore(label, entriesSection.firstChild);
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) {
+      // 이미 로그인됨
+    } else {
+      weatherAdminLogin.style.display = 'block';
+    }
+  });
+
+  wLoginBtn && wLoginBtn.addEventListener('click', async () => {
+    const email    = document.getElementById('wAdminEmail').value.trim();
+    const password = document.getElementById('wAdminPassword').value;
+    if (!email || !password) return;
+    wLoginBtn.disabled = true;
+    wLoginStatus.textContent = '—';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      wLoginStatus.textContent = error.message;
+      wLoginBtn.disabled = false;
+      return;
+    }
+    weatherAdminLogin.style.display = 'none';
+    wLoginStatus.textContent = '';
+    await loadEntries();
+  });
+
+  document.getElementById('wAdminPassword') &&
+    document.getElementById('wAdminPassword').addEventListener('keydown', e => {
+      if (e.key === 'Enter') wLoginBtn.click();
+    });
 }
 
+// ── init ──
 initWeather();
 loadEntries();

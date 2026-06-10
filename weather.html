@@ -59,6 +59,22 @@
 
     <!-- 오른쪽: 타임라인 -->
     <div class="weather-col-right">
+
+      <!-- 어드민 로그인 (admin 모드에서만 표시) -->
+      <div id="weatherAdminLogin" style="display:none; margin-bottom:2rem; padding-bottom:2rem; border-bottom:1px solid var(--border);">
+        <div class="admin-label" style="margin-bottom:1rem;">관리자 로그인</div>
+        <div class="form-field">
+          <label for="wAdminEmail">이메일</label>
+          <input type="email" id="wAdminEmail" autocomplete="username" />
+        </div>
+        <div class="form-field">
+          <label for="wAdminPassword">비밀번호</label>
+          <input type="password" id="wAdminPassword" autocomplete="current-password" />
+        </div>
+        <button class="btn-submit" id="wLoginBtn">로그인</button>
+        <div class="form-status" id="wLoginStatus"></div>
+      </div>
+
       <section class="entries-section">
         <div class="entries-label">남겨진 날씨들</div>
         <div class="timeline" id="entriesList">
