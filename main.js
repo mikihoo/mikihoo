@@ -344,3 +344,20 @@ function escapeAttr(str) {
 }
 
 loadArchive();
+
+// ── Hero parallax (desktop only) ──
+if (window.innerWidth > 768) {
+  const heroVideo = document.querySelector('.hero-video');
+  if (heroVideo) {
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          heroVideo.style.transform = `translateY(${window.scrollY * 0.35}px)`;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+  }
+}
