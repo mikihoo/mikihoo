@@ -37,39 +37,53 @@ function setWeatherText(text) {
   if (weatherBar) { weatherBar.textContent = text; weatherBar.classList.add('visible'); }
 }
 
-function initWeather() {
-  if (!navigator.geolocation) {
-    setWeatherText('위치 정보를 지원하지 않는 환경입니다.');
-    return;
-  }
-  if (weatherNow) weatherNow.textContent = '위치 확인 중—';
-  navigator.geolocation.getCurrentPosition(
-    async ({ coords }) => {
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`;
-      console.log('[weather] fetching:', url);
-      try {
-        const res = await fetch(url);
-        const d = await res.json();
-        console.log('[weather] response status:', res.status, d);
-        if (!res.ok) {
-          console.warn('[weather] API error:', d.message || res.statusText);
-          setWeatherText(`날씨를 불러오지 못했습니다. (${d.message || res.status})`);
-          return;
-        }
-        const temp = Math.round(d.main.temp);
-        const hum  = d.main.humidity;
-        const desc = d.weather[0].description;
-        setWeatherText(`지금 이곳 — ${temp}°C · 습도 ${hum}% · ${desc}`);
-      } catch (err) {
-        console.error('[weather] fetch error:', err);
-        setWeatherText('날씨를 불러오지 못했습니다.');
-      }
-    },
-    (err) => {
-      console.log('[weather] geolocation denied or error:', err.message);
-      setWeatherText('위치 권한이 필요합니다.');
+async function fetchWeather(lat, lon) {
+  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OW_KEY}&units=metric&lang=kr`;
+  console.log('[weather] fetching:', url);
+  const res = await fetch(url);
+  const d = await res.json();
+  console.log('[weather] response:', res.status, d);
+  if (!res.ok) throw new Error(d.message || res.status);
+  const temp = Math.round(d.main.temp);
+  const hum  = d.main.humidity;
+  const desc = d.weather[0].description;
+  setWeatherText(`지금 이곳 — ${temp}°C · 습도 ${hum}% · ${desc}`);
+}
+
+async function initWeather() {
+  if (weatherNow) weatherNow.textContent = '—';
+
+  // 1. GPS 시도
+  if (navigator.geolocation) {
+    try {
+      const coords = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => resolve(coords),
+          reject,
+          { timeout: 6000 }
+        )
+      );
+      await fetchWeather(coords.latitude, coords.longitude);
+      return;
+    } catch (err) {
+      console.log('[weather] geolocation failed, trying IP fallback:', err.message);
     }
-  );
+  }
+
+  // 2. IP 기반 폴백
+  try {
+    const ipRes = await fetch('https://ipapi.co/json/');
+    const ipData = await ipRes.json();
+    console.log('[weather] IP location:', ipData);
+    if (ipData.latitude && ipData.longitude) {
+      await fetchWeather(ipData.latitude, ipData.longitude);
+      return;
+    }
+  } catch (err) {
+    console.error('[weather] IP fallback failed:', err);
+  }
+
+  setWeatherText('날씨를 불러오지 못했습니다.');
 }
 
 // ══════════════════════════════════════
@@ -282,9 +296,6 @@ function escapeAttr(str) {
 
 // ── init ──
 if (isAdmin) {
-  const navAdmin = document.getElementById('navAdmin');
-  if (navAdmin) navAdmin.style.display = 'inline';
-  // ?admin 상태임을 표시
   const label = document.createElement('div');
   label.style.cssText = 'font-size:0.62rem;letter-spacing:0.12em;color:var(--accent-dim);font-family:"EB Garamond",serif;margin-bottom:1rem;opacity:0.7;';
   label.textContent = '관리자 모드 — 각 항목에 삭제 버튼이 표시됩니다';
