@@ -15,7 +15,7 @@
 */
 
 const SUPABASE_URL = 'https://bemcdwxyxdguhcrgkhth.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_OqRSqp72ZNcx_ZkYF19sDg_apt4HTOD';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbWNkd3h5eGRndWhjcmdraHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMjMzOTgsImV4cCI6MjA5NjU5OTM5OH0.GrPUSR7EKSlOGXVI7gxQnwvQvwZBUcuOi2I9EsbrNxk';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -76,7 +76,8 @@ form.addEventListener('submit', async (e) => {
       .upload(path, file, { contentType: file.type, upsert: false });
 
     if (uploadError) {
-      statusEl.textContent = '사진 업로드에 실패했습니다. 다시 시도해주세요.';
+      statusEl.textContent = `사진 업로드 실패: ${uploadError.message}`;
+      console.error('upload error:', uploadError);
       submitBtn.disabled = false;
       return;
     }
@@ -93,7 +94,8 @@ form.addEventListener('submit', async (e) => {
     .insert({ nickname, message, image_url: photo_url });
 
   if (insertError) {
-    statusEl.textContent = '저장에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    statusEl.textContent = `저장 실패: ${insertError.message}`;
+    console.error('insert error:', insertError);
     submitBtn.disabled = false;
     return;
   }
