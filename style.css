@@ -22,6 +22,7 @@ html { font-size: 18px; }
 
 @media (max-width: 768px) {
   html { font-size: 15px; }
+  .weather-page .weather-bar { display: none !important; }
 }
 
 body {
