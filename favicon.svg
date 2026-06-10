@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- cloud -->
+  <path d="M8 20 Q8 14 14 14 Q15 10 20 10 Q26 10 26 16 Q29 16 29 20 Z"
+        fill="#a8a89e"/>
+  <!-- rain drops -->
+  <line x1="13" y1="23" x2="11" y2="27" stroke="#6a6a62" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="18" y1="23" x2="16" y2="27" stroke="#6a6a62" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="23" y1="23" x2="21" y2="27" stroke="#6a6a62" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
