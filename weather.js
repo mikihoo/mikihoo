@@ -14,6 +14,7 @@ const isAdmin = new URLSearchParams(location.search).has('admin');
 
 // ── DOM ──
 const weatherBar  = document.getElementById('weatherBar');
+const weatherNow  = document.getElementById('weatherNow');
 const form        = document.getElementById('weatherForm');
 const nickInput   = document.getElementById('nickname');
 const msgInput    = document.getElementById('message');
@@ -31,11 +32,17 @@ let filteredBlob = null; // canvas 처리된 이미지 blob
 // 1. 실시간 날씨
 // ══════════════════════════════════════
 
+function setWeatherText(text) {
+  if (weatherNow) weatherNow.textContent = text;
+  if (weatherBar) { weatherBar.textContent = text; weatherBar.classList.add('visible'); }
+}
+
 function initWeather() {
   if (!navigator.geolocation) {
-    console.log('[weather] geolocation not supported');
+    setWeatherText('위치 정보를 지원하지 않는 환경입니다.');
     return;
   }
+  if (weatherNow) weatherNow.textContent = '위치 확인 중—';
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
       const url = `https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`;
@@ -46,19 +53,21 @@ function initWeather() {
         console.log('[weather] response status:', res.status, d);
         if (!res.ok) {
           console.warn('[weather] API error:', d.message || res.statusText);
+          setWeatherText(`날씨를 불러오지 못했습니다. (${d.message || res.status})`);
           return;
         }
         const temp = Math.round(d.main.temp);
         const hum  = d.main.humidity;
         const desc = d.weather[0].description;
-        weatherBar.textContent = `지금 이곳 — ${temp}°C · 습도 ${hum}% · ${desc}`;
-        weatherBar.classList.add('visible');
+        setWeatherText(`지금 이곳 — ${temp}°C · 습도 ${hum}% · ${desc}`);
       } catch (err) {
         console.error('[weather] fetch error:', err);
+        setWeatherText('날씨를 불러오지 못했습니다.');
       }
     },
     (err) => {
       console.log('[weather] geolocation denied or error:', err.message);
+      setWeatherText('위치 권한이 필요합니다.');
     }
   );
 }
@@ -272,5 +281,16 @@ function escapeAttr(str) {
 }
 
 // ── init ──
+if (isAdmin) {
+  const navAdmin = document.getElementById('navAdmin');
+  if (navAdmin) navAdmin.style.display = 'inline';
+  // ?admin 상태임을 표시
+  const label = document.createElement('div');
+  label.style.cssText = 'font-size:0.62rem;letter-spacing:0.12em;color:var(--accent-dim);font-family:"EB Garamond",serif;margin-bottom:1rem;opacity:0.7;';
+  label.textContent = '관리자 모드 — 각 항목에 삭제 버튼이 표시됩니다';
+  const entriesSection = document.querySelector('.entries-section');
+  if (entriesSection) entriesSection.insertBefore(label, entriesSection.firstChild);
+}
+
 initWeather();
 loadEntries();

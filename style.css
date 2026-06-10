@@ -308,6 +308,16 @@ a { color: inherit; text-decoration: none; }
   font-weight: 400;
 }
 
+.weather-now {
+  margin-top: 0.8rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  min-height: 1.2em;
+}
+
 .weather-form {
   padding-top: 2rem;
   border-top: 1px solid var(--border);
