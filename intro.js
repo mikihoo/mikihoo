@@ -44,9 +44,9 @@
   const TEXT_COLOR = '#e8e4dc';
 
   // ── Phase timing (ms) ──
-  const T_FADEIN  = 300;   // fade in text
-  const T_HOLD    = 500;   // hold
-  const T_SCATTER = 700;   // scatter + dissolve
+  const T_FADEIN  = 600;   // fade in text
+  const T_HOLD    = 1000;  // hold
+  const T_SCATTER = 1400;  // scatter + dissolve
   const T_TOTAL   = T_FADEIN + T_HOLD + T_SCATTER;
 
   // ── Sample text pixels → particles ──
