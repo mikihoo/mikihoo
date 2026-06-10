@@ -189,8 +189,11 @@
       requestAnimationFrame(tick);
 
     } else {
-      // Done — fade out overlay, fade in page content
-      overlay.style.transition = 'opacity 0.3s ease';
+      // Done — clear canvas first to prevent grain flash, then fade out
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0f0f0f';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      overlay.style.transition = 'opacity 0.4s ease';
       overlay.style.opacity = '0';
       showPage();
       setTimeout(() => { overlay.style.display = 'none'; }, 320);
