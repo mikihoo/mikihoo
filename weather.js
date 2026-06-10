@@ -293,14 +293,39 @@ function applyFilterToDrawing() {
 // 3. 실시간 날씨
 // ══════════════════════════════════════
 
+function weatherIconSvg(iconCode) {
+  if (!iconCode) return '';
+  const base = iconCode.slice(0, 2);
+  const night = iconCode.endsWith('n');
+  const o = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" class="weather-icon-svg">${p}</svg>`;
+  switch (base) {
+    case '01':
+      return night
+        ? o(`<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`)
+        : o(`<circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`);
+    case '02':
+      return o(`<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>`);
+    case '03': case '04':
+      return o(`<path d="M17 18H7a5 5 0 1 1 4.9-6H17a3 3 0 0 1 0 6z"/>`);
+    case '09': case '10':
+      return o(`<path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/><line x1="12" y1="21" x2="12" y2="23"/>`);
+    case '11':
+      return o(`<path d="M19 16.9A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/><polyline points="13 11 9 17 15 17 11 23"/>`);
+    case '13':
+      return o(`<line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/>`);
+    case '50':
+      return o(`<line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16" x2="21" y2="16"/>`);
+    default:
+      return o(`<circle cx="12" cy="12" r="5"/>`);
+  }
+}
+
 function setWeatherText(text, iconCode) {
   currentWeather = text;
-  const iconHtml = iconCode
-    ? `<img class="weather-icon" src="https://openweathermap.org/img/wn/${iconCode}@2x.png" alt="" />`
-    : '';
-  if (weatherNow) weatherNow.innerHTML = `${iconHtml}<span>${escapeHtml(text)}</span>`;
+  const icon = weatherIconSvg(iconCode);
+  if (weatherNow) weatherNow.innerHTML = `${icon}<span>${escapeHtml(text)}</span>`;
   if (weatherBar) {
-    weatherBar.innerHTML = `${iconHtml}<span>지금 이곳 — ${escapeHtml(text)}</span>`;
+    weatherBar.innerHTML = `${icon}<span>지금 이곳 — ${escapeHtml(text)}</span>`;
     weatherBar.classList.add('visible');
   }
 }

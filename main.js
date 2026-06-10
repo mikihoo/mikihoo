@@ -11,6 +11,7 @@ const writeBox        = document.getElementById('writeBox');
 const loginBtn        = document.getElementById('loginBtn');
 const logoutBtn       = document.getElementById('logoutBtn');
 const postBtn         = document.getElementById('postBtn');
+const cancelEditBtn   = document.getElementById('cancelEditBtn');
 const loginStatus     = document.getElementById('loginStatus');
 const postStatus      = document.getElementById('postStatus');
 const archiveList     = document.getElementById('archiveList');
@@ -27,23 +28,51 @@ const modalExcerpt    = document.getElementById('modalExcerpt');
 const modalWeather    = document.getElementById('modalWeather');
 
 const OW_KEY = '22e32b9735460bfc73f39f24811548cf';
-let posts        = [];
-let filteredBlobs = [];
-let currentWeather = null;
+let posts           = [];
+let filteredBlobs   = [];
+let currentWeather  = null;
+let editingPostId   = null;
+let existingImageUrls  = [];
+let originalImageUrls  = [];
+
+function weatherIconSvg(iconCode) {
+  if (!iconCode) return '';
+  const base = iconCode.slice(0, 2);
+  const night = iconCode.endsWith('n');
+  const o = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" class="weather-icon-svg">${p}</svg>`;
+  switch (base) {
+    case '01':
+      return night
+        ? o(`<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`)
+        : o(`<circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`);
+    case '02':
+      return o(`<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>`);
+    case '03': case '04':
+      return o(`<path d="M17 18H7a5 5 0 1 1 4.9-6H17a3 3 0 0 1 0 6z"/>`);
+    case '09': case '10':
+      return o(`<path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/><line x1="12" y1="21" x2="12" y2="23"/>`);
+    case '11':
+      return o(`<path d="M19 16.9A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/><polyline points="13 11 9 17 15 17 11 23"/>`);
+    case '13':
+      return o(`<line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/>`);
+    case '50':
+      return o(`<line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16" x2="21" y2="16"/>`);
+    default:
+      return o(`<circle cx="12" cy="12" r="5"/>`);
+  }
+}
 
 // 날씨 가져오기 — 표시 + 글 작성 시 포함
 function setIndexWeather(text, iconCode) {
   currentWeather = text;
-  const iconHtml = iconCode
-    ? `<img class="weather-icon" src="https://openweathermap.org/img/wn/${iconCode}@2x.png" alt="" />`
-    : '';
+  const icon = weatherIconSvg(iconCode);
   const bar = document.getElementById('indexWeatherBar');
   if (bar) {
-    bar.innerHTML = `${iconHtml}<span>지금 이곳 — ${escapeHtml(text)}</span>`;
+    bar.innerHTML = `${icon}<span>지금 이곳 — ${escapeHtml(text)}</span>`;
     bar.classList.add('visible');
   }
   const preview = document.getElementById('adminWeatherPreview');
-  if (preview) preview.innerHTML = `${iconHtml}<span>${escapeHtml(text)}</span>`;
+  if (preview) preview.innerHTML = `${icon}<span>${escapeHtml(text)}</span>`;
 }
 
 async function initIndexWeather() {
@@ -129,23 +158,34 @@ function applyRetroFilter(file) {
 postPhoto.addEventListener('change', async () => {
   const files = Array.from(postPhoto.files);
   filteredBlobs = [];
-  multiPreview.innerHTML = '';
 
-  if (!files.length) { postFileName.textContent = ''; postFilterStatus.textContent = ''; return; }
+  if (!files.length) {
+    postFileName.textContent = '';
+    postFilterStatus.textContent = '';
+    if (editingPostId) renderEditPreview(); else multiPreview.innerHTML = '';
+    return;
+  }
 
-  postFileName.textContent    = `${files.length}장 선택됨`;
+  postFileName.textContent     = `${files.length}장 선택됨`;
   postFilterStatus.textContent = '필터 적용 중—';
 
   for (const file of files) {
     const blob = await applyRetroFilter(file);
     filteredBlobs.push(blob);
-    const img = document.createElement('img');
-    img.className = 'multi-thumb';
-    img.src = URL.createObjectURL(blob);
-    multiPreview.appendChild(img);
   }
 
   postFilterStatus.textContent = '';
+  if (editingPostId) {
+    renderEditPreview();
+  } else {
+    multiPreview.innerHTML = '';
+    filteredBlobs.forEach(blob => {
+      const img = document.createElement('img');
+      img.className = 'multi-thumb';
+      img.src = URL.createObjectURL(blob);
+      multiPreview.appendChild(img);
+    });
+  }
 });
 
 // ── Login ──
@@ -172,7 +212,10 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 // ── Post submit ──
-postBtn.addEventListener('click', async () => {
+postBtn.addEventListener('click', () => editingPostId ? doUpdate() : doInsert());
+cancelEditBtn && cancelEditBtn.addEventListener('click', cancelEdit);
+
+async function doInsert() {
   const title   = document.getElementById('postTitle').value.trim();
   const excerpt = document.getElementById('postExcerpt').value.trim();
   const date    = document.getElementById('postDate').value.trim();
@@ -183,49 +226,143 @@ postBtn.addEventListener('click', async () => {
 
   const image_urls = [];
   const blobs = filteredBlobs.length ? filteredBlobs : Array.from(postPhoto.files);
-
   for (let i = 0; i < blobs.length; i++) {
-    const blob = blobs[i];
     const path = `archive/${Date.now()}-${Math.random().toString(36).slice(2)}-${i}.jpg`;
-    const { error: upErr } = await sb.storage
-      .from('weather-photos')
-      .upload(path, blob, { contentType: 'image/jpeg' });
-    if (upErr) {
-      postStatus.textContent = `사진 업로드 실패 (${i+1}번): ${upErr.message}`;
-      postBtn.disabled = false;
-      return;
-    }
+    const { error: upErr } = await sb.storage.from('weather-photos').upload(path, blobs[i], { contentType: 'image/jpeg' });
+    if (upErr) { postStatus.textContent = `사진 업로드 실패 (${i+1}번): ${upErr.message}`; postBtn.disabled = false; return; }
     image_urls.push(sb.storage.from('weather-photos').getPublicUrl(path).data.publicUrl);
   }
 
   const minOrder = posts.length ? Math.min(...posts.map(p => p.order_index ?? 0)) : 0;
-
   const { error } = await sb.from('archive_posts').insert({
-    title,
-    excerpt: excerpt || null,
-    image_url: image_urls[0] || null,
-    image_urls: image_urls,
-    post_date: date || null,
-    artist: artist || null,
-    weather_text: currentWeather || null,
-    order_index: minOrder - 1
+    title, excerpt: excerpt || null,
+    image_url: image_urls[0] || null, image_urls,
+    post_date: date || null, artist: artist || null,
+    weather_text: currentWeather || null, order_index: minOrder - 1
   });
 
-  if (error) {
-    postStatus.textContent = `저장 실패: ${error.message}`;
-    postBtn.disabled = false;
-    return;
-  }
-
+  if (error) { postStatus.textContent = `저장 실패: ${error.message}`; postBtn.disabled = false; return; }
   postStatus.textContent = '올라갔습니다.';
   ['postTitle','postExcerpt','postDate','postArtist'].forEach(id => document.getElementById(id).value = '');
-  postPhoto.value = '';
-  postFileName.textContent = '';
-  filteredBlobs = [];
-  multiPreview.innerHTML = '';
+  postPhoto.value = ''; postFileName.textContent = ''; filteredBlobs = []; multiPreview.innerHTML = '';
   postBtn.disabled = false;
   await loadArchive();
-});
+}
+
+async function doUpdate() {
+  const title   = document.getElementById('postTitle').value.trim();
+  const excerpt = document.getElementById('postExcerpt').value.trim();
+  const date    = document.getElementById('postDate').value.trim();
+  const artist  = document.getElementById('postArtist').value.trim();
+  if (!title) { postStatus.textContent = '제목을 입력해주세요.'; return; }
+  postBtn.disabled = true;
+  postStatus.textContent = '—';
+
+  const newUrls = [];
+  for (let i = 0; i < filteredBlobs.length; i++) {
+    const path = `archive/${Date.now()}-${Math.random().toString(36).slice(2)}-${i}.jpg`;
+    const { error: upErr } = await sb.storage.from('weather-photos').upload(path, filteredBlobs[i], { contentType: 'image/jpeg' });
+    if (upErr) { postStatus.textContent = `사진 업로드 실패: ${upErr.message}`; postBtn.disabled = false; return; }
+    newUrls.push(sb.storage.from('weather-photos').getPublicUrl(path).data.publicUrl);
+  }
+
+  const image_urls = [...existingImageUrls, ...newUrls];
+  const { error } = await sb.from('archive_posts').update({
+    title, excerpt: excerpt || null,
+    image_url: image_urls[0] || null, image_urls,
+    post_date: date || null, artist: artist || null,
+  }).eq('id', editingPostId);
+
+  if (error) { postStatus.textContent = `수정 실패: ${error.message}`; postBtn.disabled = false; return; }
+
+  // 삭제된 이미지 Storage에서도 제거
+  const removed = originalImageUrls.filter(u => !existingImageUrls.includes(u));
+  const removedPaths = removed.map(storagePathFromUrl).filter(Boolean);
+  if (removedPaths.length) await sb.storage.from('weather-photos').remove(removedPaths);
+
+  postStatus.textContent = '수정됐습니다.';
+  postBtn.disabled = false;
+  cancelEdit();
+  await loadArchive();
+}
+
+function startEdit(post) {
+  const urls = post.image_urls?.length ? post.image_urls : (post.image_url ? [post.image_url] : []);
+  editingPostId      = post.id;
+  originalImageUrls  = [...urls];
+  existingImageUrls  = [...urls];
+  filteredBlobs      = [];
+
+  document.getElementById('postTitle').value   = post.title   || '';
+  document.getElementById('postDate').value    = post.post_date || '';
+  document.getElementById('postArtist').value  = post.artist  || '';
+  document.getElementById('postExcerpt').value = post.excerpt || '';
+  postPhoto.value = ''; postFileName.textContent = '';
+  postBtn.textContent = '수정 완료';
+  if (cancelEditBtn) cancelEditBtn.style.display = '';
+  postStatus.textContent = '';
+  renderEditPreview();
+  writeBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  editingPostId = null; originalImageUrls = []; existingImageUrls = []; filteredBlobs = [];
+  ['postTitle','postExcerpt','postDate','postArtist'].forEach(id => document.getElementById(id).value = '');
+  postPhoto.value = ''; postFileName.textContent = ''; multiPreview.innerHTML = '';
+  postBtn.textContent = '올리다';
+  if (cancelEditBtn) cancelEditBtn.style.display = 'none';
+  postStatus.textContent = '';
+}
+
+function renderEditPreview() {
+  multiPreview.innerHTML = '';
+  existingImageUrls.forEach((url, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'multi-thumb-wrap';
+    const img = document.createElement('img');
+    img.className = 'multi-thumb'; img.src = escapeAttr(url); img.alt = '';
+    const ctrl = document.createElement('div');
+    ctrl.className = 'thumb-controls';
+    if (i > 0) {
+      const btn = document.createElement('button');
+      btn.className = 'thumb-btn'; btn.textContent = '←'; btn.dataset.i = i; btn.dataset.action = 'left';
+      ctrl.appendChild(btn);
+    }
+    if (i < existingImageUrls.length - 1) {
+      const btn = document.createElement('button');
+      btn.className = 'thumb-btn'; btn.textContent = '→'; btn.dataset.i = i; btn.dataset.action = 'right';
+      ctrl.appendChild(btn);
+    }
+    const rm = document.createElement('button');
+    rm.className = 'thumb-btn'; rm.textContent = '×'; rm.dataset.i = i; rm.dataset.action = 'remove';
+    ctrl.appendChild(rm);
+    wrap.appendChild(img); wrap.appendChild(ctrl);
+    multiPreview.appendChild(wrap);
+  });
+  filteredBlobs.forEach((blob, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'multi-thumb-wrap';
+    const img = document.createElement('img');
+    img.className = 'multi-thumb'; img.src = URL.createObjectURL(blob); img.alt = '';
+    const ctrl = document.createElement('div');
+    ctrl.className = 'thumb-controls';
+    const rm = document.createElement('button');
+    rm.className = 'thumb-btn'; rm.textContent = '×'; rm.dataset.bi = i; rm.dataset.action = 'remove-new';
+    ctrl.appendChild(rm);
+    wrap.appendChild(img); wrap.appendChild(ctrl);
+    multiPreview.appendChild(wrap);
+  });
+  multiPreview.querySelectorAll('.thumb-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const i = parseInt(btn.dataset.i ?? btn.dataset.bi);
+      if (btn.dataset.action === 'left')       { [existingImageUrls[i-1], existingImageUrls[i]] = [existingImageUrls[i], existingImageUrls[i-1]]; renderEditPreview(); }
+      else if (btn.dataset.action === 'right') { [existingImageUrls[i], existingImageUrls[i+1]] = [existingImageUrls[i+1], existingImageUrls[i]]; renderEditPreview(); }
+      else if (btn.dataset.action === 'remove') { existingImageUrls.splice(i, 1); renderEditPreview(); }
+      else if (btn.dataset.action === 'remove-new') { filteredBlobs.splice(i, 1); renderEditPreview(); }
+    });
+  });
+}
 
 // ── Load archive ──
 async function loadArchive() {
@@ -251,6 +388,7 @@ function renderItem(post, i, total) {
     <span class="admin-controls">
       <button class="ctrl-btn move-up"   data-id="${escapeAttr(post.id)}" ${i === 0 ? 'disabled' : ''}>↑</button>
       <button class="ctrl-btn move-down" data-id="${escapeAttr(post.id)}" ${i === total-1 ? 'disabled' : ''}>↓</button>
+      <button class="ctrl-btn edit-btn"  data-id="${escapeAttr(post.id)}">수정</button>
       <button class="ctrl-btn delete-btn" data-id="${escapeAttr(post.id)}">삭제</button>
     </span>` : '';
 
@@ -272,6 +410,14 @@ function bindItemEvents() {
   });
 
   if (!isAdmin) return;
+
+  archiveList.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const post = posts.find(p => p.id === btn.dataset.id);
+      if (post) startEdit(post);
+    });
+  });
 
   archiveList.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', async e => {
