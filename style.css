@@ -540,6 +540,89 @@ a { color: inherit; text-decoration: none; }
 .tl-save-btn:hover { color: var(--accent); }
 .delete-btn:hover { color: #c46a6a; border-color: #7a4040; }
 
+/* ── Media tabs (사진 / 그리기) ── */
+.media-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.media-tab {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'EB Garamond', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.3s;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+.media-tab.active { color: var(--accent); border-bottom-color: var(--accent-dim); }
+.media-tab:hover  { color: var(--text-dim); }
+
+/* ── Drawing canvas ── */
+#drawCanvas {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  border: 1px solid #2a2a2a;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.draw-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.draw-tool-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'EB Garamond', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.3s;
+}
+.draw-tool-btn.active { color: var(--accent); }
+.draw-tool-btn:hover  { color: var(--text-dim); }
+
+.draw-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 2px;
+  background: #2a2a2a;
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+.draw-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  cursor: pointer;
+}
+.draw-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: none;
+  cursor: pointer;
+}
+
 /* ── Post Modal ── */
 
 .post-modal {

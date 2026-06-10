@@ -47,12 +47,29 @@
         </div>
 
         <div class="form-field">
-          <label>사진 (선택)</label>
-          <label for="photo" class="file-label">파일 선택 —</label>
-          <input type="file" id="photo" name="photo" accept="image/*" />
-          <div class="file-name" id="fileName"></div>
-          <div class="filter-status" id="filterStatus"></div>
-          <img class="preview-img" id="previewImg" alt="" />
+          <div class="media-tabs">
+            <button type="button" class="media-tab active" id="tabPhotoBtn">사진</button>
+            <button type="button" class="media-tab" id="tabDrawBtn">그리기</button>
+          </div>
+
+          <div id="photoPanel">
+            <label for="photo" class="file-label">파일 선택 —</label>
+            <input type="file" id="photo" name="photo" accept="image/*" />
+            <div class="file-name" id="fileName"></div>
+            <div class="filter-status" id="filterStatus"></div>
+            <img class="preview-img" id="previewImg" alt="" />
+          </div>
+
+          <div id="drawPanel" style="display:none;">
+            <canvas id="drawCanvas"></canvas>
+            <div class="draw-tools">
+              <button type="button" class="draw-tool-btn active" id="penBtn">펜</button>
+              <button type="button" class="draw-tool-btn" id="eraserBtn">지우개</button>
+              <input type="range" id="brushSize" min="1" max="8" value="2" class="draw-slider" />
+              <button type="button" class="draw-tool-btn" id="clearCanvasBtn">초기화</button>
+            </div>
+            <div class="filter-status" id="drawStatus"></div>
+          </div>
         </div>
 
         <div style="display:flex; align-items:center; gap:1.4rem; flex-wrap:wrap;">

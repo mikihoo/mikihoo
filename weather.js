@@ -21,8 +21,10 @@ const statusEl     = document.getElementById('formStatus');
 const listEl       = document.getElementById('entriesList');
 
 let filteredBlob   = null;
+let drawingBlob    = null; // blob from drawing canvas
+let activeTab      = 'photo'; // 'photo' | 'draw'
 let currentWeather = null;
-let entriesMap     = {}; // id → entry (for export)
+let entriesMap     = {};
 
 // ══════════════════════════════════════
 // 1. 글감 placeholder 로테이션
@@ -60,7 +62,174 @@ const PROMPTS = [
 })();
 
 // ══════════════════════════════════════
-// 2. 실시간 날씨
+// 2. 사진 / 그리기 탭
+// ══════════════════════════════════════
+
+const tabPhotoBtn   = document.getElementById('tabPhotoBtn');
+const tabDrawBtn    = document.getElementById('tabDrawBtn');
+const photoPanel    = document.getElementById('photoPanel');
+const drawPanel     = document.getElementById('drawPanel');
+const drawCanvas    = document.getElementById('drawCanvas');
+const penBtn        = document.getElementById('penBtn');
+const eraserBtn     = document.getElementById('eraserBtn');
+const brushSizeEl   = document.getElementById('brushSize');
+const clearCanvasBtn= document.getElementById('clearCanvasBtn');
+const drawStatus    = document.getElementById('drawStatus');
+
+// 탭 전환
+tabPhotoBtn && tabPhotoBtn.addEventListener('click', () => {
+  activeTab = 'photo';
+  tabPhotoBtn.classList.add('active');
+  tabDrawBtn.classList.remove('active');
+  photoPanel.style.display = '';
+  drawPanel.style.display  = 'none';
+});
+
+tabDrawBtn && tabDrawBtn.addEventListener('click', () => {
+  activeTab = 'draw';
+  tabDrawBtn.classList.add('active');
+  tabPhotoBtn.classList.remove('active');
+  drawPanel.style.display  = '';
+  photoPanel.style.display = 'none';
+  initDrawCanvas();
+});
+
+// 드로잉 캔버스
+let drawCtx      = null;
+let isDrawing    = false;
+let eraserMode   = false;
+let canvasReady  = false;
+
+function initDrawCanvas() {
+  if (canvasReady) return;
+  canvasReady = true;
+
+  const size = Math.min(300, drawCanvas.parentElement.clientWidth);
+  drawCanvas.width  = size;
+  drawCanvas.height = size;
+  drawCtx = drawCanvas.getContext('2d');
+  drawCtx.fillStyle = '#0f0f0f';
+  drawCtx.fillRect(0, 0, size, size);
+  drawCtx.lineCap  = 'round';
+  drawCtx.lineJoin = 'round';
+}
+
+function getPos(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top)  * scaleY,
+  };
+}
+
+function startDraw(e) {
+  if (!drawCtx) return;
+  e.preventDefault();
+  isDrawing = true;
+  const { x, y } = getPos(e, drawCanvas);
+  drawCtx.beginPath();
+  drawCtx.moveTo(x, y);
+}
+
+function moveDraw(e) {
+  if (!isDrawing || !drawCtx) return;
+  e.preventDefault();
+  const { x, y } = getPos(e, drawCanvas);
+  drawCtx.lineWidth   = parseInt(brushSizeEl.value);
+  drawCtx.strokeStyle = eraserMode ? '#0f0f0f' : '#e8e4dc';
+  drawCtx.lineTo(x, y);
+  drawCtx.stroke();
+}
+
+function endDraw(e) {
+  if (!drawCtx) return;
+  e.preventDefault();
+  isDrawing = false;
+  drawCtx.beginPath();
+}
+
+drawCanvas.addEventListener('mousedown',  startDraw);
+drawCanvas.addEventListener('mousemove',  moveDraw);
+drawCanvas.addEventListener('mouseup',    endDraw);
+drawCanvas.addEventListener('mouseleave', endDraw);
+drawCanvas.addEventListener('touchstart', startDraw, { passive: false });
+drawCanvas.addEventListener('touchmove',  moveDraw,  { passive: false });
+drawCanvas.addEventListener('touchend',   endDraw,   { passive: false });
+
+penBtn && penBtn.addEventListener('click', () => {
+  eraserMode = false;
+  penBtn.classList.add('active');
+  eraserBtn.classList.remove('active');
+  drawCanvas.style.cursor = 'crosshair';
+});
+
+eraserBtn && eraserBtn.addEventListener('click', () => {
+  eraserMode = true;
+  eraserBtn.classList.add('active');
+  penBtn.classList.remove('active');
+  drawCanvas.style.cursor = 'cell';
+});
+
+clearCanvasBtn && clearCanvasBtn.addEventListener('click', () => {
+  if (!drawCtx) return;
+  drawCtx.fillStyle = '#0f0f0f';
+  drawCtx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+});
+
+// 드로잉 → 필터 적용 blob
+function applyFilterToDrawing() {
+  return new Promise(resolve => {
+    const src = drawCanvas;
+    const w = src.width, h = src.height;
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(src, 0, 0);
+
+    const id = ctx.getImageData(0, 0, w, h);
+    const px = id.data;
+    const cx = w / 2, cy = h / 2;
+    const maxDist = Math.sqrt(cx * cx + cy * cy);
+
+    for (let i = 0; i < px.length; i += 4) {
+      let v = px[i] * 0.299 + px[i+1] * 0.587 + px[i+2] * 0.114;
+      v = (v * 0.82 - 128) * 1.5 + 128;
+      const px_ = (i / 4) % w, py_ = Math.floor((i / 4) / w);
+      const dx  = px_ - cx, dy = py_ - cy;
+      const dist = Math.sqrt(dx*dx + dy*dy) / maxDist;
+      const vig  = dist > 0.35 ? (dist - 0.35) / 0.65 * 0.65 : 0;
+      v = v * (1 - vig);
+      const n = (Math.random() - 0.5) * 22;
+      const out_ = Math.min(255, Math.max(0, v + n));
+      px[i] = px[i+1] = px[i+2] = out_;
+    }
+    ctx.putImageData(id, 0, 0);
+
+    // 그레인 오버레이 0.06
+    const gc = document.createElement('canvas');
+    gc.width = gc.height = 128;
+    const gctx = gc.getContext('2d');
+    const gid  = gctx.createImageData(128, 128);
+    for (let i = 0; i < gid.data.length; i += 4) {
+      const v = Math.random() * 255 | 0;
+      gid.data[i] = gid.data[i+1] = gid.data[i+2] = v;
+      gid.data[i+3] = 255;
+    }
+    gctx.putImageData(gid, 0, 0);
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle   = ctx.createPattern(gc, 'repeat');
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+
+    out.toBlob(blob => resolve(blob), 'image/jpeg', 0.88);
+  });
+}
+
+// ══════════════════════════════════════
+// 3. 실시간 날씨
 // ══════════════════════════════════════
 
 function setWeatherText(text) {
@@ -108,7 +277,7 @@ async function initWeather() {
 }
 
 // ══════════════════════════════════════
-// 3. 레트로 필터
+// 4. 레트로 필터 (사진용)
 // ══════════════════════════════════════
 
 function applyRetroFilter(file) {
@@ -169,7 +338,7 @@ photoInput.addEventListener('change', async () => {
 });
 
 // ══════════════════════════════════════
-// 4. 폼 제출
+// 5. 폼 제출
 // ══════════════════════════════════════
 
 form.addEventListener('submit', async (e) => {
@@ -184,19 +353,37 @@ form.addEventListener('submit', async (e) => {
   statusEl.textContent = '—';
 
   let image_url = null;
-  const originalFile = photoInput.files[0];
-  if (originalFile) {
-    const uploadBlob = filteredBlob || originalFile;
+
+  if (activeTab === 'draw' && drawCtx) {
+    // 드로잉 → 필터 → 업로드
+    if (drawStatus) { drawStatus.textContent = '필터 적용 중—'; }
+    const blob = await applyFilterToDrawing();
+    if (drawStatus) { drawStatus.textContent = ''; }
     const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
     const { error: uploadError } = await sb.storage
       .from('weather-photos')
-      .upload(path, uploadBlob, { contentType: 'image/jpeg', upsert: false });
+      .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
     if (uploadError) {
-      statusEl.textContent = `사진 업로드 실패: ${uploadError.message}`;
+      statusEl.textContent = `업로드 실패: ${uploadError.message}`;
       submitBtn.disabled = false;
       return;
     }
     image_url = sb.storage.from('weather-photos').getPublicUrl(path).data.publicUrl;
+  } else {
+    const originalFile = photoInput.files[0];
+    if (originalFile) {
+      const uploadBlob = filteredBlob || originalFile;
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const { error: uploadError } = await sb.storage
+        .from('weather-photos')
+        .upload(path, uploadBlob, { contentType: 'image/jpeg', upsert: false });
+      if (uploadError) {
+        statusEl.textContent = `사진 업로드 실패: ${uploadError.message}`;
+        submitBtn.disabled = false;
+        return;
+      }
+      image_url = sb.storage.from('weather-photos').getPublicUrl(path).data.publicUrl;
+    }
   }
 
   const { error: insertError } = await sb
@@ -211,17 +398,22 @@ form.addEventListener('submit', async (e) => {
 
   statusEl.textContent = '남겨졌습니다.';
   form.reset();
-  fileNameEl.textContent = '';
+  fileNameEl.textContent   = '';
   filterStatus.textContent = '';
   filteredBlob = null;
   previewImg.style.display = 'none';
   previewImg.src = '';
+  // 드로잉 캔버스 초기화
+  if (drawCtx) {
+    drawCtx.fillStyle = '#0f0f0f';
+    drawCtx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+  }
   submitBtn.disabled = false;
   await loadEntries();
 });
 
 // ══════════════════════════════════════
-// 5. 타임라인 렌더링
+// 6. 타임라인 렌더링
 // ══════════════════════════════════════
 
 async function loadEntries() {
@@ -286,7 +478,7 @@ function bindTimelineEvents() {
 }
 
 // ══════════════════════════════════════
-// 6. 채집하기
+// 7. 채집하기
 // ══════════════════════════════════════
 
 const collectBtn = document.getElementById('collectBtn');
@@ -308,7 +500,7 @@ if (collectBtn) {
 }
 
 // ══════════════════════════════════════
-// 7. 카드 PNG 익스포트
+// 8. 카드 PNG 익스포트
 // ══════════════════════════════════════
 
 async function exportEntryCard(entry) {
@@ -457,7 +649,7 @@ function wrapText(ctx, text, x, y, maxW, lineH) {
 }
 
 // ══════════════════════════════════════
-// 7. 유틸
+// 9. 유틸
 // ══════════════════════════════════════
 
 function formatDate(iso) {

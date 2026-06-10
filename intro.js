@@ -24,7 +24,6 @@
   ].join(';');
   document.body.appendChild(overlay);
 
-  // Block page scroll during intro
   document.body.style.overflow = 'hidden';
 
   const canvas = document.createElement('canvas');
@@ -40,43 +39,38 @@
 
   const isMobile  = window.innerWidth <= 768;
   const fontSize  = Math.round(window.innerWidth * (isMobile ? 0.12 : 0.06));
-  const TEXT      = '微氣候';
+  const TEXT       = '微氣候';
   const TEXT_COLOR = '#e8e4dc';
 
   // ── Phase timing (ms) ──
-  const T_FADEIN  = 600;   // fade in text
-  const T_HOLD    = 1000;  // hold
-  const T_SCATTER = 1400;  // scatter + dissolve
+  const T_FADEIN  = 600;
+  const T_HOLD    = 1000;
+  const T_SCATTER = 1400;
   const T_TOTAL   = T_FADEIN + T_HOLD + T_SCATTER;
 
   // ── Sample text pixels → particles ──
   function sampleParticles() {
-    // Render text to offscreen canvas for pixel sampling
-    const off = document.createElement('canvas');
-    const pad = fontSize * 0.6;
+    const off  = document.createElement('canvas');
     off.width  = canvas.width;
     off.height = canvas.height;
     const octx = off.getContext('2d');
-    octx.font = `400 ${fontSize}px 'EB Garamond', serif`;
-    octx.fillStyle = '#ffffff';
-    octx.textAlign = 'center';
+    octx.font         = `400 ${fontSize}px 'EB Garamond', serif`;
+    octx.fillStyle    = '#ffffff';
+    octx.textAlign    = 'center';
     octx.textBaseline = 'middle';
     octx.fillText(TEXT, off.width / 2, off.height / 2);
 
     const data = octx.getImageData(0, 0, off.width, off.height).data;
     const pts  = [];
-    const step = 3; // sample every N pixels for density control
-
-    for (let y = 0; y < off.height; y += step) {
+    const step = 3;
+    for (let y = 0; y < off.height; y += step)
       for (let x = 0; x < off.width; x += step) {
         const i = (y * off.width + x) * 4;
         if (data[i + 3] > 128) pts.push({ x, y });
       }
-    }
 
-    // Limit to 800
     if (pts.length > 800) {
-      const skip = pts.length / 800;
+      const skip    = pts.length / 800;
       const sampled = [];
       for (let i = 0; i < pts.length; i += skip) sampled.push(pts[Math.floor(i)]);
       return sampled;
@@ -89,41 +83,17 @@
   function initParticles() {
     const pts = sampleParticles();
     particles = pts.map(p => {
-      const grey  = Math.random() > 0.5 ? 232 : 168;
+      const grey = Math.random() > 0.5 ? 232 : 168;
       return {
         x: p.x, y: p.y,
         ox: p.x, oy: p.y,
-        vx: (Math.random() - 0.5) * 1.2,          // 좌우 약간만 흔들림
-        vy: 2.5 + Math.random() * 4,               // 아래로 낙하
+        vx: (Math.random() - 0.5) * 1.2,
+        vy: 2.5 + Math.random() * 4,
         size: 1 + Math.random(),
-        delay: Math.random() * 0.35,               // 파티클별 낙하 시작 시차
+        delay: Math.random() * 0.35,
         color: `rgb(${grey},${grey - 4},${grey - 12})`,
       };
     });
-  }
-
-  // ── Grain helper ──
-  let grainAlpha = 0;
-  function drawGrain(alpha) {
-    if (alpha <= 0) return;
-    const tileSize = 120;
-    const offG = document.createElement('canvas');
-    offG.width = offG.height = tileSize;
-    const gctx = offG.getContext('2d');
-    const id = gctx.createImageData(tileSize, tileSize);
-    const d  = id.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const v = Math.random() * 255 | 0;
-      d[i] = d[i+1] = d[i+2] = v;
-      d[i+3] = 255;
-    }
-    gctx.putImageData(id, 0, 0);
-    const pat = ctx.createPattern(offG, 'repeat');
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = pat;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
   }
 
   // ── RAF loop ──
@@ -138,50 +108,36 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (elapsed < T_FADEIN) {
-      // Phase 1: fade in text
       const t = elapsed / T_FADEIN;
-      ctx.globalAlpha = t * t; // ease-in
-      ctx.font = `400 ${fontSize}px 'EB Garamond', serif`;
-      ctx.fillStyle = TEXT_COLOR;
-      ctx.textAlign = 'center';
+      ctx.globalAlpha = t * t;
+      ctx.font         = `400 ${fontSize}px 'EB Garamond', serif`;
+      ctx.fillStyle    = TEXT_COLOR;
+      ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(TEXT, canvas.width / 2, canvas.height / 2);
       ctx.globalAlpha = 1;
       requestAnimationFrame(tick);
 
     } else if (elapsed < T_FADEIN + T_HOLD) {
-      // Phase 2: hold
-      ctx.globalAlpha = 1;
-      ctx.font = `400 ${fontSize}px 'EB Garamond', serif`;
-      ctx.fillStyle = TEXT_COLOR;
-      ctx.textAlign = 'center';
+      ctx.globalAlpha  = 1;
+      ctx.font         = `400 ${fontSize}px 'EB Garamond', serif`;
+      ctx.fillStyle    = TEXT_COLOR;
+      ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(TEXT, canvas.width / 2, canvas.height / 2);
-      ctx.globalAlpha = 1;
-
-      // Init particles at hold start
       if (!particles) initParticles();
       requestAnimationFrame(tick);
 
     } else if (elapsed < T_TOTAL) {
-      // Phase 3: scatter
       const t = (elapsed - T_FADEIN - T_HOLD) / T_SCATTER;
-      const ease = t * t; // ease-in scatter
-
-      // Grain peaks at 0.4, then fades
-      grainAlpha = t < 0.4
-        ? (t / 0.4) * 0.18
-        : ((1 - t) / 0.6) * 0.18;
-      drawGrain(grainAlpha);
-
       if (particles) {
         particles.forEach(p => {
-          const pt = Math.max(0, (t - p.delay) / (1 - p.delay));
-          const fall = pt * pt; // ease-in 낙하
+          const pt   = Math.max(0, (t - p.delay) / (1 - p.delay));
+          const fall = pt * pt;
           p.x = p.ox + p.vx * pt * fontSize * 0.5;
           p.y = p.oy + p.vy * fall * fontSize * 1.2;
           ctx.globalAlpha = Math.max(0, 1 - pt * 1.3);
-          ctx.fillStyle = p.color;
+          ctx.fillStyle   = p.color;
           ctx.fillRect(p.x, p.y, p.size, p.size);
         });
         ctx.globalAlpha = 1;
@@ -189,25 +145,21 @@
       requestAnimationFrame(tick);
 
     } else {
-      // Done — clear canvas first to prevent grain flash, then fade out
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#0f0f0f';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       overlay.style.transition = 'opacity 0.4s ease';
-      overlay.style.opacity = '0';
+      overlay.style.opacity    = '0';
       showPage();
-      setTimeout(() => { overlay.style.display = 'none'; }, 320);
+      setTimeout(() => { overlay.style.display = 'none'; }, 420);
     }
   }
 
-  // Safety fallback — always show page after 3s even if animation errors
   const fallback = setTimeout(showPage, 3000);
 
-  // Wait for font to load before starting
   const start = () => {
     clearTimeout(fallback);
     requestAnimationFrame(tick);
-    // Re-register fallback after animation starts
     setTimeout(showPage, T_TOTAL + 1000);
   };
 
