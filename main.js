@@ -24,9 +24,24 @@ const modalImages     = document.getElementById('modalImages');
 const modalDate       = document.getElementById('modalDate');
 const modalTitle      = document.getElementById('modalTitle');
 const modalExcerpt    = document.getElementById('modalExcerpt');
+const modalWeather    = document.getElementById('modalWeather');
 
+const OW_KEY = '22e32b9735460bfc73f39f24811548cf';
 let posts        = [];
-let filteredBlobs = []; // canvas 처리된 blob 배열
+let filteredBlobs = [];
+let currentWeather = null;
+
+// 날씨 미리 가져오기 (글 작성 시 포함)
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(({ coords }) => {
+    fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.main) currentWeather = `${Math.round(d.main.temp)}°C · ${d.main.humidity}% · ${d.weather[0].description}`;
+      })
+      .catch(() => {});
+  }, () => {});
+}
 
 // ── Admin ──
 if (isAdmin) {
@@ -159,6 +174,7 @@ postBtn.addEventListener('click', async () => {
     image_urls: image_urls,
     post_date: date || null,
     artist: artist || null,
+    weather_text: currentWeather || null,
     order_index: minOrder - 1
   });
 
@@ -273,6 +289,7 @@ function openModal(post) {
   modalDate.textContent    = post.post_date || '';
   modalTitle.textContent   = post.title;
   modalExcerpt.textContent = post.excerpt || '';
+  if (modalWeather) modalWeather.textContent = post.weather_text || '';
   postModal.classList.add('open');
   document.body.style.overflow = 'hidden';
 }

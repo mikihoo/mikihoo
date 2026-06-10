@@ -26,64 +26,41 @@ const submitBtn   = document.getElementById('submitBtn');
 const statusEl    = document.getElementById('formStatus');
 const listEl      = document.getElementById('entriesList');
 
-let filteredBlob = null; // canvas 처리된 이미지 blob
+let filteredBlob = null;
+let currentWeather = null; // 현재 날씨 텍스트 (저장 시 포함)
 
 // ══════════════════════════════════════
 // 1. 실시간 날씨
 // ══════════════════════════════════════
 
 function setWeatherText(text) {
+  currentWeather = text;
   if (weatherNow) weatherNow.textContent = text;
   if (weatherBar) { weatherBar.textContent = text; weatherBar.classList.add('visible'); }
 }
 
-async function fetchWeather(lat, lon) {
+async function fetchWeatherByCoords(lat, lon) {
   const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OW_KEY}&units=metric&lang=kr`;
   console.log('[weather] fetching:', url);
   const res = await fetch(url);
   const d = await res.json();
   console.log('[weather] response:', res.status, d);
-  if (!res.ok) throw new Error(d.message || res.status);
+  if (!res.ok) throw new Error(d.message || res.statusText);
   const temp = Math.round(d.main.temp);
   const hum  = d.main.humidity;
   const desc = d.weather[0].description;
-  setWeatherText(`지금 이곳 — ${temp}°C · 습도 ${hum}% · ${desc}`);
+  setWeatherText(`${temp}°C · ${hum}% · ${desc}`);
 }
 
-async function initWeather() {
-  if (weatherNow) weatherNow.textContent = '—';
-
-  // 1. GPS 시도
-  if (navigator.geolocation) {
-    try {
-      const coords = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(
-          ({ coords }) => resolve(coords),
-          reject,
-          { timeout: 6000 }
-        )
-      );
-      await fetchWeather(coords.latitude, coords.longitude);
-      return;
-    } catch (err) {
-      console.log('[weather] geolocation failed, trying IP fallback:', err.message);
-    }
-  }
-
-  // 2. IP 기반 폴백
-  try {
-    const ipRes = await fetch('https://ipapi.co/json/');
-    const ipData = await ipRes.json();
-    console.log('[weather] IP location:', ipData);
-    if (ipData.latitude && ipData.longitude) {
-      await fetchWeather(ipData.latitude, ipData.longitude);
-      return;
-    }
-  } catch (err) {
-    console.error('[weather] IP fallback failed:', err);
-  }
-
-  setWeatherText('날씨를 불러오지 못했습니다.');
+function initWeather() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      fetchWeatherByCoords(coords.latitude, coords.longitude)
+        .catch(err => console.warn('[weather] API error:', err.message));
+    },
+    err => console.log('[weather] geolocation error:', err.code, err.message)
+  );
 }
 
 // ══════════════════════════════════════
@@ -201,7 +178,7 @@ form.addEventListener('submit', async (e) => {
 
   const { error: insertError } = await sb
     .from('guestbook')
-    .insert({ nickname, message, image_url });
+    .insert({ nickname, message, image_url, weather_text: currentWeather || null });
 
   if (insertError) {
     statusEl.textContent = `저장 실패: ${insertError.message}`;
@@ -250,6 +227,10 @@ function renderTimelineItem(entry) {
     ? `<button class="ctrl-btn delete-btn tl-delete" data-id="${escapeAttr(entry.id)}">삭제</button>`
     : '';
 
+  const weatherHtml = entry.weather_text
+    ? `<span class="tl-weather">${escapeHtml(entry.weather_text)}</span>`
+    : '';
+
   return `
     <div class="tl-item ${entry.image_url ? 'has-photo' : ''}" data-id="${escapeAttr(entry.id)}">
       <div class="tl-left">
@@ -258,6 +239,7 @@ function renderTimelineItem(entry) {
       </div>
       <div class="tl-right">
         <span class="tl-nickname">${escapeHtml(entry.nickname)}</span>
+        ${weatherHtml}
         ${imgHtml}
         <p class="tl-message">${escapeHtml(entry.message)}</p>
       </div>
