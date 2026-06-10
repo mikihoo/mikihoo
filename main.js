@@ -309,7 +309,7 @@ function cancelEdit() {
   editingPostId = null; originalImageUrls = []; existingImageUrls = []; filteredBlobs = [];
   ['postTitle','postExcerpt','postDate','postArtist'].forEach(id => document.getElementById(id).value = '');
   postPhoto.value = ''; postFileName.textContent = ''; multiPreview.innerHTML = '';
-  postBtn.textContent = '올리다';
+  postBtn.textContent = 'upload';
   if (cancelEditBtn) cancelEditBtn.style.display = 'none';
   postStatus.textContent = '';
 }
