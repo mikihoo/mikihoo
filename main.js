@@ -269,6 +269,12 @@ function bindItemEvents() {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
       if (!confirm('삭제할까요?')) return;
+      const post = posts.find(p => p.id === btn.dataset.id);
+      if (post) {
+        const urls = post.image_urls?.length ? post.image_urls : (post.image_url ? [post.image_url] : []);
+        const paths = urls.map(storagePathFromUrl).filter(Boolean);
+        if (paths.length) await sb.storage.from('weather-photos').remove(paths);
+      }
       await sb.from('archive_posts').delete().eq('id', btn.dataset.id);
       await loadArchive();
     });
@@ -341,6 +347,12 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) {
   return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function storagePathFromUrl(url) {
+  const marker = '/weather-photos/';
+  const idx = url.indexOf(marker);
+  return idx !== -1 ? decodeURIComponent(url.slice(idx + marker.length).split('?')[0]) : null;
 }
 
 loadArchive();

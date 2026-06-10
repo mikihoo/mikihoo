@@ -329,7 +329,7 @@ function applyRetroFilter(file) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const MAX = 1200;
+      const MAX = 900;
       let w = img.naturalWidth, h = img.naturalHeight;
       if (w > MAX || h > MAX) {
         const r = Math.min(MAX / w, MAX / h);
@@ -515,6 +515,11 @@ function bindTimelineEvents() {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { alert('로그인이 필요합니다.'); return; }
       if (!confirm('삭제할까요?')) return;
+      const entry = entriesMap[btn.dataset.id];
+      if (entry?.image_url) {
+        const path = storagePathFromUrl(entry.image_url);
+        if (path) await sb.storage.from('weather-photos').remove([path]);
+      }
       const { error } = await sb.from('guestbook').delete().eq('id', btn.dataset.id);
       if (error) { alert('삭제 실패: ' + error.message); return; }
       await loadEntries();
@@ -712,6 +717,11 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function storagePathFromUrl(url) {
+  const marker = '/weather-photos/';
+  const idx = url.indexOf(marker);
+  return idx !== -1 ? decodeURIComponent(url.slice(idx + marker.length).split('?')[0]) : null;
 }
 
 // ── Admin login ──
