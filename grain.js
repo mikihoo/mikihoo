@@ -35,8 +35,9 @@
   }
 
   // ── Opacity state ──
-  const BASE       = 0.018;   // 절반으로 줄임
-  const SCROLL_MAX = 0.03;
+  const isMobile   = window.innerWidth <= 768;
+  const BASE       = isMobile ? 0.009 : 0.018;
+  const SCROLL_MAX = isMobile ? 0.015 : 0.03;
   let displayOpacity = 0;
   let scrollTarget   = BASE;
   let fadeStart      = null;
