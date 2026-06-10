@@ -97,37 +97,54 @@ function applyRetroFilter(file) {
       }
 
       const canvas = document.createElement('canvas');
-      canvas.width  = w;
-      canvas.height = h;
+      canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
-
-      // 흑백 + 세피아 + 노출 보정
-      ctx.filter = 'grayscale(85%) sepia(12%) brightness(0.86) contrast(1.1)';
       ctx.drawImage(img, 0, 0, w, h);
-      ctx.filter = 'none';
 
-      // 비네팅 (radial gradient)
-      const vig = ctx.createRadialGradient(w / 2, h / 2, h * 0.22, w / 2, h / 2, h * 0.82);
-      vig.addColorStop(0, 'rgba(0,0,0,0)');
-      vig.addColorStop(1, 'rgba(0,0,0,0.42)');
-      ctx.fillStyle = vig;
-      ctx.fillRect(0, 0, w, h);
+      const id = ctx.getImageData(0, 0, w, h);
+      const px = id.data;
+      const cx = w / 2, cy = h / 2, maxDist = Math.sqrt(cx*cx + cy*cy);
 
-      // 필름 그레인 (pixel noise)
-      const imageData = ctx.getImageData(0, 0, w, h);
-      const px = imageData.data;
       for (let i = 0; i < px.length; i += 4) {
-        const n = (Math.random() - 0.5) * 18;
-        px[i]     = Math.min(255, Math.max(0, px[i]     + n));
-        px[i + 1] = Math.min(255, Math.max(0, px[i + 1] + n));
-        px[i + 2] = Math.min(255, Math.max(0, px[i + 2] + n));
-      }
-      ctx.putImageData(imageData, 0, 0);
+        let r = px[i], g = px[i+1], b = px[i+2];
 
-      canvas.toBlob(blob => {
-        URL.revokeObjectURL(img.src);
-        resolve(blob);
-      }, 'image/jpeg', 0.88);
+        // 흑백 (grayscale 85%)
+        const gray = r * 0.299 + g * 0.587 + b * 0.114;
+        r = r * 0.15 + gray * 0.85;
+        g = g * 0.15 + gray * 0.85;
+        b = b * 0.15 + gray * 0.85;
+
+        // 세피아 12%
+        const sr = r * 0.393 + g * 0.769 + b * 0.189;
+        const sg = r * 0.349 + g * 0.686 + b * 0.168;
+        const sb = r * 0.272 + g * 0.534 + b * 0.131;
+        r = r * 0.88 + sr * 0.12;
+        g = g * 0.88 + sg * 0.12;
+        b = b * 0.88 + sb * 0.12;
+
+        // brightness 0.86, contrast 1.1
+        r = (r * 0.86 - 128) * 1.1 + 128;
+        g = (g * 0.86 - 128) * 1.1 + 128;
+        b = (b * 0.86 - 128) * 1.1 + 128;
+
+        // 비네팅
+        const px_ = (i / 4) % w, py_ = Math.floor((i / 4) / w);
+        const dx = px_ - cx, dy = py_ - cy;
+        const dist = Math.sqrt(dx*dx + dy*dy) / maxDist;
+        const vig = dist > 0.4 ? (dist - 0.4) / 0.6 * 0.55 : 0;
+        r = r * (1 - vig);
+        g = g * (1 - vig);
+        b = b * (1 - vig);
+
+        // 그레인
+        const n = (Math.random() - 0.5) * 18;
+        px[i]   = Math.min(255, Math.max(0, r + n));
+        px[i+1] = Math.min(255, Math.max(0, g + n));
+        px[i+2] = Math.min(255, Math.max(0, b + n));
+      }
+      ctx.putImageData(id, 0, 0);
+
+      canvas.toBlob(blob => { URL.revokeObjectURL(img.src); resolve(blob); }, 'image/jpeg', 0.88);
     };
     img.src = URL.createObjectURL(file);
   });
