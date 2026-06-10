@@ -472,26 +472,68 @@ form.addEventListener('submit', async (e) => {
 });
 
 // ══════════════════════════════════════
-// 6. 타임라인 렌더링
+// 6. 타임라인 렌더링 (무한 스크롤)
 // ══════════════════════════════════════
 
-async function loadEntries() {
+const PAGE_SIZE  = 20;
+let   tlOffset   = 0;
+let   tlLoading  = false;
+let   tlExhausted = false;
+
+async function loadEntries(reset = true) {
+  if (reset) {
+    tlOffset     = 0;
+    tlExhausted  = false;
+    entriesMap   = {};
+    listEl.innerHTML = '';
+  }
+  if (tlLoading || tlExhausted) return;
+  tlLoading = true;
+
   const { data, error } = await sb
     .from('guestbook')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(60);
+    .range(tlOffset, tlOffset + PAGE_SIZE - 1);
 
-  if (error || !data || data.length === 0) {
-    listEl.innerHTML = '<p class="entries-empty">아직 아무것도 없습니다.</p>';
+  tlLoading = false;
+
+  if (error) {
+    if (reset) listEl.innerHTML = '<p class="entries-empty">아직 아무것도 없습니다.</p>';
     return;
   }
 
-  entriesMap = {};
+  if (!data || data.length === 0) {
+    if (reset) listEl.innerHTML = '<p class="entries-empty">아직 아무것도 없습니다.</p>';
+    tlExhausted = true;
+    return;
+  }
+
   data.forEach(e => { entriesMap[e.id] = e; });
-  listEl.innerHTML = data.map(renderTimelineItem).join('');
+  const frag = document.createDocumentFragment();
+  data.forEach(e => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderTimelineItem(e);
+    frag.appendChild(tmp.firstElementChild);
+  });
+  listEl.appendChild(frag);
   bindTimelineEvents();
+
+  tlOffset += data.length;
+  if (data.length < PAGE_SIZE) tlExhausted = true;
 }
+
+// 오른쪽 컬럼 스크롤 감지 → 다음 페이지 로드
+window.addEventListener('load', () => {
+  const col = document.querySelector('.weather-col-right');
+  if (!col) return;
+  col.addEventListener('scroll', () => {
+    if (tlLoading || tlExhausted) return;
+    if (col.scrollTop + col.clientHeight >= col.scrollHeight - 200) {
+      loadEntries(false);
+    }
+  }, { passive: true });
+});
 
 function renderTimelineItem(entry) {
   const date = formatDate(entry.created_at);
