@@ -31,23 +31,34 @@ let filteredBlob = null; // canvas 처리된 이미지 blob
 // ══════════════════════════════════════
 
 function initWeather() {
-  if (!navigator.geolocation) return;
+  if (!navigator.geolocation) {
+    console.log('[weather] geolocation not supported');
+    return;
+  }
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`;
+      console.log('[weather] fetching:', url);
       try {
-        const res = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=${coords.latitude}&lon=${coords.longitude}&appid=${OW_KEY}&units=metric&lang=kr`
-        );
-        if (!res.ok) return;
+        const res = await fetch(url);
         const d = await res.json();
+        console.log('[weather] response status:', res.status, d);
+        if (!res.ok) {
+          console.warn('[weather] API error:', d.message || res.statusText);
+          return;
+        }
         const temp = Math.round(d.main.temp);
         const hum  = d.main.humidity;
         const desc = d.weather[0].description;
         weatherBar.textContent = `지금 이곳 — ${temp}°C · 습도 ${hum}% · ${desc}`;
         weatherBar.classList.add('visible');
-      } catch (_) { /* 조용히 실패 */ }
+      } catch (err) {
+        console.error('[weather] fetch error:', err);
+      }
     },
-    () => { /* 위치 거부 시 무시 */ }
+    (err) => {
+      console.log('[weather] geolocation denied or error:', err.message);
+    }
   );
 }
 

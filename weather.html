@@ -22,42 +22,48 @@
 
   <main class="weather-main">
 
-    <section class="weather-intro">
-      <h2>당신의 날씨</h2>
-    </section>
+    <!-- 왼쪽: 입력 폼 -->
+    <div class="weather-col-left">
+      <section class="weather-intro">
+        <h2>당신의 날씨</h2>
+      </section>
 
-    <form class="weather-form" id="weatherForm" novalidate>
-      <div class="form-field">
-        <label for="nickname">호칭 / 呼稱</label>
-        <input type="text" id="nickname" name="nickname"
-          placeholder="아무 이름이어도 됩니다" maxlength="30" autocomplete="off" />
-      </div>
+      <form class="weather-form" id="weatherForm" novalidate>
+        <div class="form-field">
+          <label for="nickname">호칭 / 呼稱</label>
+          <input type="text" id="nickname" name="nickname"
+            placeholder="아무 이름이어도 됩니다" maxlength="30" autocomplete="off" />
+        </div>
 
-      <div class="form-field">
-        <label for="message">일기 / 日記</label>
-        <textarea id="message" name="message"
-          placeholder="한두 문장이면 충분합니다" maxlength="200"></textarea>
-      </div>
+        <div class="form-field">
+          <label for="message">일기 / 日記</label>
+          <textarea id="message" name="message"
+            placeholder="한두 문장이면 충분합니다" maxlength="200"></textarea>
+        </div>
 
-      <div class="form-field">
-        <label>사진 (선택)</label>
-        <label for="photo" class="file-label">파일 선택 —</label>
-        <input type="file" id="photo" name="photo" accept="image/*" />
-        <div class="file-name" id="fileName"></div>
-        <div class="filter-status" id="filterStatus"></div>
-        <img class="preview-img" id="previewImg" alt="" />
-      </div>
+        <div class="form-field">
+          <label>사진 (선택)</label>
+          <label for="photo" class="file-label">파일 선택 —</label>
+          <input type="file" id="photo" name="photo" accept="image/*" />
+          <div class="file-name" id="fileName"></div>
+          <div class="filter-status" id="filterStatus"></div>
+          <img class="preview-img" id="previewImg" alt="" />
+        </div>
 
-      <button type="submit" class="btn-submit" id="submitBtn">저장</button>
-      <div class="form-status" id="formStatus"></div>
-    </form>
+        <button type="submit" class="btn-submit" id="submitBtn">저장</button>
+        <div class="form-status" id="formStatus"></div>
+      </form>
+    </div>
 
-    <section class="entries-section">
-      <div class="entries-label">남겨진 날씨들</div>
-      <div class="timeline" id="entriesList">
-        <p class="entries-empty">아직 아무것도 없습니다.</p>
-      </div>
-    </section>
+    <!-- 오른쪽: 타임라인 -->
+    <div class="weather-col-right">
+      <section class="entries-section">
+        <div class="entries-label">남겨진 날씨들</div>
+        <div class="timeline" id="entriesList">
+          <p class="entries-empty">아직 아무것도 없습니다.</p>
+        </div>
+      </section>
+    </div>
 
   </main>
 
