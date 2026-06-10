@@ -45,31 +45,30 @@
 
   function easeIn(t) { return t * t; }
 
-  // ── Scroll handler (window + weather col elements) ──
+  // ── Scroll handler ──
   let scrollTimer = null;
-  function onScroll() {
-    const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
-    const frac = maxScroll > 10
-      ? Math.min(window.scrollY / maxScroll, 1)
-      : 0.5; // 컬럼 내부 스크롤 시 중간값 사용
-    scrollTarget = BASE + frac * (SCROLL_MAX - BASE);
+
+  function applyScrollOpacity(progress) {
+    scrollTarget = BASE + Math.min(progress, 1) * (SCROLL_MAX - BASE);
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => { scrollTarget = BASE; }, 150);
   }
 
-  function onColScroll() {
-    scrollTarget = SCROLL_MAX;
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => { scrollTarget = BASE; }, 150);
+  if (window.lenis) {
+    window.lenis.on('scroll', ({ progress }) => applyScrollOpacity(progress));
+  } else {
+    window.addEventListener('scroll', () => {
+      const max = Math.max(1, document.body.scrollHeight - window.innerHeight);
+      applyScrollOpacity(window.scrollY / max);
+    }, { passive: true });
+    window.addEventListener('touchmove', () => applyScrollOpacity(0.5), { passive: true });
   }
 
-  window.addEventListener('scroll',    onScroll, { passive: true });
-  window.addEventListener('touchmove', onScroll, { passive: true });
-
-  // weather 페이지 컬럼 스크롤 연동
+  // weather 페이지 컬럼 스크롤 연동 (항상 native)
   window.addEventListener('load', () => {
-    const cols = document.querySelectorAll('.weather-col-left, .weather-col-right');
-    cols.forEach(el => el.addEventListener('scroll', onColScroll, { passive: true }));
+    document.querySelectorAll('.weather-col-left, .weather-col-right').forEach(el => {
+      el.addEventListener('scroll', () => applyScrollOpacity(0.5), { passive: true });
+    });
   });
 
   // ── RAF loop ──

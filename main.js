@@ -349,15 +349,19 @@ loadArchive();
 if (window.innerWidth > 768) {
   const heroVideo = document.querySelector('.hero-video');
   if (heroVideo) {
-    let ticking = false;
-    window.addEventListener('scroll', () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          heroVideo.style.transform = `translateY(${window.scrollY * 0.35}px)`;
-          ticking = false;
-        });
-        ticking = true;
-      }
-    }, { passive: true });
+    const moveHero = (scroll) => {
+      heroVideo.style.transform = `translateY(${scroll * 0.35}px)`;
+    };
+    if (window.lenis) {
+      window.lenis.on('scroll', ({ scroll }) => moveHero(scroll));
+    } else {
+      let ticking = false;
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          requestAnimationFrame(() => { moveHero(window.scrollY); ticking = false; });
+          ticking = true;
+        }
+      }, { passive: true });
+    }
   }
 }
