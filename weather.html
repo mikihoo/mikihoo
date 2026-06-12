@@ -73,9 +73,13 @@
           </div>
         </div>
 
-        <div style="display:flex; align-items:center; gap:1.4rem; flex-wrap:wrap;">
-          <button type="submit" class="btn-submit" id="submitBtn">저장</button>
-          <button type="button" class="tl-save-btn" id="collectBtn">채집하기</button>
+        <div style="display:flex; align-items:center; gap:1.4rem;">
+          <button type="submit" class="btn-submit" id="submitBtn">남기기</button>
+        </div>
+        <div class="collect-mobile-wrap">
+          <div class="collect-divider"></div>
+          <button type="button" class="tl-save-btn collect-btn" id="collectBtnMobile">채집하기</button>
+          <div class="collect-caption">남겨진 날씨 중 하나를 꺼내봅니다</div>
         </div>
         <div class="form-status" id="formStatus"></div>
       </form>
@@ -100,7 +104,10 @@
       </div>
 
       <section class="entries-section">
-        <div class="entries-label">남겨진 날씨들</div>
+        <div class="entries-label-row">
+          <div class="entries-label">남겨진 날씨들</div>
+          <button type="button" class="tl-save-btn collect-btn collect-desktop" id="collectBtnDesktop">채집하기</button>
+        </div>
         <div class="timeline" id="entriesList">
           <p class="entries-empty">아직 아무것도 없습니다.</p>
         </div>

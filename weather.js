@@ -630,23 +630,23 @@ function bindTimelineEvents() {
 // 7. 채집하기
 // ══════════════════════════════════════
 
-const collectBtn = document.getElementById('collectBtn');
-if (collectBtn) {
-  collectBtn.addEventListener('click', async () => {
-    collectBtn.disabled = true;
-    collectBtn.textContent = '—';
-    try {
-      const { data, error } = await sb.from('guestbook').select('*');
-      if (error || !data || data.length === 0) { collectBtn.textContent = '채집하기'; collectBtn.disabled = false; return; }
-      const entry = data[Math.floor(Math.random() * data.length)];
-      await exportEntryCard(entry);
-    } catch (e) {
-      console.warn('collect error', e);
+const collectBtns = document.querySelectorAll('.collect-btn');
+async function handleCollect() {
+  collectBtns.forEach(b => { b.disabled = true; b.textContent = '—'; });
+  try {
+    const { data, error } = await sb.from('guestbook').select('*');
+    if (error || !data || data.length === 0) {
+      collectBtns.forEach(b => { b.textContent = '채집하기'; b.disabled = false; });
+      return;
     }
-    collectBtn.textContent = '채집하기';
-    collectBtn.disabled = false;
-  });
+    const entry = data[Math.floor(Math.random() * data.length)];
+    await exportEntryCard(entry);
+  } catch (e) {
+    console.warn('collect error', e);
+  }
+  collectBtns.forEach(b => { b.textContent = '채집하기'; b.disabled = false; });
 }
+collectBtns.forEach(b => b.addEventListener('click', handleCollect));
 
 // ══════════════════════════════════════
 // 8. 카드 PNG 익스포트
