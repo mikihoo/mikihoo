@@ -11,9 +11,9 @@ import { Renderer, Program, Mesh, Triangle, Texture, Geometry }
 // Edit these values to adjust every effect without touching shader code.
 const P = {
   // Duotone color mapping  (normalized 0-1 RGB)
-  SHADOW_COLOR:    [0.07, 0.05, 0.13],   // ← deep violet for shadows/darks
+  SHADOW_COLOR:    [0.10, 0.08, 0.06],   // ← #1a1410 warm dark for shadows
   HIGHLIGHT_COLOR: [0.67, 0.67, 0.62],   // ← #a8a89e warm grey for highlights
-  DUOTONE_MIX:     0.30,                  // ← 0=pure b&w  1=full duotone
+  DUOTONE_MIX:     0.35,                  // ← 0=pure b&w  1=full duotone
 
   // Displacement / wave ripple
   DISP_BASE:       0.0022,   // ← always-on gentle ripple amplitude (try 0–0.008)
@@ -359,6 +359,11 @@ let canvasEl, renderer, gl, program, mesh, videoTexture;
 let particleMesh, particleProgram;
 let videoUvTransform = [1, 1, 0, 0];  // [sx, sy, ox, oy]
 
+// Canvas bridge — OGL checks image.width which is 0 on HTMLVideoElement;
+// drawing to a 2D canvas gives a proper .width value OGL can rely on.
+const vidCanvas = document.createElement('canvas');
+let   vidCtx    = null;
+
 function computeVideoUV() {
   if (!videoEl || !canvasEl) return;
   const vw = videoEl.videoWidth  || 1920;
@@ -453,9 +458,6 @@ function initWebGL() {
 
     mesh = new Mesh(gl, { geometry: geo, program });
 
-    // Particles (desktop, non-reduced-motion only)
-    if (P.PARTICLES && !REDUCED && !IS_MOB) initParticles();
-
     return true;
   } catch(e) {
     console.warn('[mikihoo-hero] WebGL failed, falling back to plain video', e);
@@ -525,9 +527,19 @@ function tick(ts) {
   mouseVelSm  = mouseVelSm * 0.84 + mouseVelRaw * 0.16;
   mouseVelRaw *= 0.78;
 
-  // ── Upload video texture ──────────────────────────────────────────────
-  if (videoEl.readyState >= 2) {
-    videoTexture.image      = videoEl;
+  // ── Upload video texture via canvas bridge ────────────────────────────
+  // OGL's Texture upload checks image.width; HTMLVideoElement exposes
+  // videoWidth/videoHeight instead, so we blit to a 2D canvas first.
+  if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    if (vidCanvas.width !== vw || vidCanvas.height !== vh) {
+      vidCanvas.width  = vw;
+      vidCanvas.height = vh;
+      vidCtx = vidCanvas.getContext('2d');
+      computeVideoUV();
+    }
+    vidCtx.drawImage(videoEl, 0, 0, vw, vh);
+    videoTexture.image      = vidCanvas;
     videoTexture.needsUpdate = true;
   }
 
@@ -606,12 +618,21 @@ function init() {
   // Hide original video element (still plays as texture source)
   videoEl.style.opacity = '0';
 
+  // Ensure video is playing (autoplay attr alone can be blocked in some browsers)
+  videoEl.play().catch(e => console.warn('[mikihoo-hero] video play failed', e));
+
   // Start render loop
   rafId = requestAnimationFrame(tick);
 
   // Update UV transform once video dimensions are known
   videoEl.addEventListener('loadedmetadata', computeVideoUV, { once: true });
   if (videoEl.videoWidth) computeVideoUV();
+
+  // Particles: separate try-catch so a particle failure can't kill the main shader
+  if (P.PARTICLES && !REDUCED && !IS_MOB) {
+    try { initParticles(); }
+    catch(e) { console.warn('[mikihoo-hero] particles failed', e); }
+  }
 
   // Dot interaction
   if (dotEl) {
