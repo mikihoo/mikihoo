@@ -37,13 +37,20 @@ const P = {
   MOUSE_INERTIA:   0.08,
   ACTIVE_EASE_DUR: 2.2,      // load → fully active fade-in
 
+  // ── Pointer reaction (particles part around the cursor) ─────────────────
+  pointer: {
+    radius: { fine: 60, coarse: 100 },  // reaction radius in CSS px (mouse/pen vs touch)
+    forceAmplitude:  0.24,   // push strength — raised to compensate the small radius
+    idleAttenuation: 0.15,   // residual force factor when the pointer is still (0–0.3)
+    leaveFadeMs:     200,    // ease-out when mouse leaves window / touch ends
+    // multitouch: single primary pointer handled; per-touch fields = TODO
+  },
+
   // ── Particles (the main visual) ──────────────────────────────────────────
   PARTICLES:        true,
   PART_SIZE:        2.2,     // base point size (px, scaled by dpr & lum)
   PART_ALPHA:       0.50,    // overall opacity — kept low so video shows through
   PART_DRIFT:       0.012,   // autonomous noise-flow drift (UV)
-  PART_REPEL:       0.17,    // pointer repulsion strength
-  PART_REPEL_R:     0.10,    // pointer repulsion radius (UV²-ish)
   PART_STREAK:      1.6,     // fast-pointer streak multiplier
   PART_GLITCH_FRAC: 0.12,    // base fraction that RGB-glitch-jump (0-1)
   PART_GLITCH_AMP:  0.05,    // glitch jump distance (UV)
@@ -222,8 +229,9 @@ uniform vec4  uVideoUV;
 uniform float uPointSize;
 uniform float uDpr;
 uniform float uDrift;
-uniform float uRepel;
-uniform float uRepelR;
+uniform vec2  uPointerRadius;  // UV-space radii (px / [width,height]) → circular in px
+uniform float uPointerForce;   // push amplitude
+uniform float uPointerActive;  // velocity-gated × leave-fade presence
 uniform float uStreak;
 uniform float uGlitchFrac;
 uniform float uGlitchAmp;
@@ -260,11 +268,15 @@ void main() {
   pos += vec2(snoise(uv*42.0 + uTime*9.0 + aRand*7.0),
               snoise(uv*42.0 - uTime*9.0)) * uExcite * uJitterGain;
 
-  // ── Pointer repulsion — the field parts around the cursor ────────────
-  vec2  toM  = pos - uMouse;
-  float md2  = dot(toM, toM);
-  float push = exp(-md2 / uRepelR) * uRepel * uActive;
-  vec2  dir  = normalize(toM + 0.0001);
+  // ── Pointer repulsion — narrow region, smooth edge ───────────────────
+  // Normalize the offset by per-axis UV radius so the region is a circle in
+  // *pixels* (not stretched by aspect). dist=1 at the radius edge.
+  vec2  delta = pos - uMouse;
+  vec2  norm  = delta / uPointerRadius;
+  float dist  = length(norm);
+  float falloff = pow(1.0 - clamp(dist, 0.0, 1.0), 2.0);   // strong center → 0 edge
+  vec2  dir   = normalize(delta + 0.0001);
+  float push  = falloff * uPointerForce * uActive * uPointerActive;
   pos += dir * push;
   pos += dir * push * uMouseVel * uStreak;   // fast pointer → streak
 
@@ -332,18 +344,29 @@ const rawMouse = { x: 0.5, y: 0.5 };
 const smMouse  = { x: 0.5, y: 0.5 };
 let mouseVelRaw = 0, mouseVelSm = 0;
 
+// Pointer type decides reaction radius; updated per-event so hybrid
+// (touch + trackpad) devices switch live. Default from media query.
+let pointerFine     = window.matchMedia('(pointer: fine)').matches;
+let pointerPresence = 0;   // eased 0→1 toward target (leave/end fades it out)
+let presenceTarget  = 0;
+
 function onPointerMove(e) {
-  const cx = e.touches ? e.touches[0].clientX : e.clientX;
-  const cy = e.touches ? e.touches[0].clientY : e.clientY;
-  const nx = cx / window.innerWidth;
-  const ny = 1.0 - cy / window.innerHeight;
+  // pen counts as fine; touch is coarse; mouse is fine
+  if (e.pointerType) pointerFine = (e.pointerType !== 'touch');
+  const nx = e.clientX / window.innerWidth;
+  const ny = 1.0 - e.clientY / window.innerHeight;
   const dx = nx - rawMouse.x, dy = ny - rawMouse.y;
   mouseVelRaw = Math.sqrt(dx*dx + dy*dy);
   rawMouse.x  = nx;
   rawMouse.y  = ny;
+  presenceTarget = 1;
 }
-window.addEventListener('mousemove', onPointerMove, { passive: true });
-window.addEventListener('touchmove', onPointerMove, { passive: true });
+window.addEventListener('pointermove', onPointerMove, { passive: true });
+window.addEventListener('pointerdown', onPointerMove, { passive: true });
+// Touch end fades out; mouse stays present until it leaves the window.
+window.addEventListener('pointerup',     e => { if (e.pointerType === 'touch') presenceTarget = 0; }, { passive: true });
+window.addEventListener('pointercancel', () => { presenceTarget = 0; }, { passive: true });
+document.addEventListener('mouseleave',  () => { presenceTarget = 0; });
 
 // ─── AUDIO ────────────────────────────────────────────────────────────────
 let analyser, freqData, audioStream;
@@ -546,8 +569,9 @@ function initParticles() {
       uPointSize:      { value: P.PART_SIZE },
       uDpr:            { value: dpr },
       uDrift:          { value: REDUCED ? P.PART_DRIFT * 0.25 : P.PART_DRIFT },
-      uRepel:          { value: P.PART_REPEL },
-      uRepelR:         { value: P.PART_REPEL_R },
+      uPointerRadius:  { value: [0.05, 0.05] },
+      uPointerForce:   { value: P.pointer.forceAmplitude },
+      uPointerActive:  { value: 0 },
       uStreak:         { value: P.PART_STREAK },
       uGlitchFrac:     { value: REDUCED ? 0 : P.PART_GLITCH_FRAC },
       uGlitchAmp:      { value: P.PART_GLITCH_AMP },
@@ -615,6 +639,16 @@ function tick(ts) {
   mouseVelRaw *= 0.78;
   const mvel  = Math.min(mouseVelSm * 50, 1);
 
+  // Pointer reaction radius (px → per-axis UV so the region is circular in px)
+  const radiusPx = pointerFine ? P.pointer.radius.fine : P.pointer.radius.coarse;
+  const radiusUV = [radiusPx / window.innerWidth, radiusPx / window.innerHeight];
+  // Presence: ease toward target over leaveFadeMs (smooth fade on leave/end)
+  pointerPresence += (presenceTarget - pointerPresence)
+                   * Math.min(1, dt / (P.pointer.leaveFadeMs / 1000));
+  // Idle attenuation: still pointer → weak force, scales up with velocity
+  const velGate = P.pointer.idleAttenuation + (1 - P.pointer.idleAttenuation) * mvel;
+  const pointerActive = pointerPresence * velGate;
+
   // Video frame upload via canvas bridge
   if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
     const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
@@ -650,6 +684,8 @@ function tick(ts) {
     pu.uActive.value    = activeEase;
     pu.uMouse.value     = [smMouse.x, smMouse.y];
     pu.uMouseVel.value  = mvel;
+    pu.uPointerRadius.value = radiusUV;
+    pu.uPointerActive.value = pointerActive;
     pu.uExcite.value    = audioLevel * audioEase;
     pu.uScatterAmt.value = audioBass * audioEase * P.audio.bass.scatterGain * 0.05
                          + transientEff * 0.04;
