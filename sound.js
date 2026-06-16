@@ -1,3 +1,6 @@
+import { Renderer, Program, Mesh, Triangle, Texture }
+  from 'https://cdn.jsdelivr.net/npm/ogl/+esm';
+
 // ── Supabase ──
 const SUPABASE_URL = 'https://bemcdwxyxdguhcrgkhth.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbWNkd3h5eGRndWhjcmdraHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMjMzOTgsImV4cCI6MjA5NjU5OTM5OH0.GrPUSR7EKSlOGXVI7gxQnwvQvwZBUcuOi2I9EsbrNxk';
@@ -92,6 +95,7 @@ function renderTrack(t, i, total) {
     <span class="admin-controls">
       <button class="ctrl-btn move-up"   data-id="${escapeAttr(t.id)}" ${i === 0 ? 'disabled' : ''}>↑</button>
       <button class="ctrl-btn move-down" data-id="${escapeAttr(t.id)}" ${i === total-1 ? 'disabled' : ''}>↓</button>
+      <button class="ctrl-btn edit-btn"   data-id="${escapeAttr(t.id)}">수정</button>
       <button class="ctrl-btn delete-btn" data-id="${escapeAttr(t.id)}">삭제</button>
     </span>` : '';
   return `
@@ -113,6 +117,14 @@ function bindTrackEvents() {
 
   if (!isAdmin) return;
 
+  trackListEl.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const t = tracks.find(x => x.id === btn.dataset.id);
+      if (t) startEdit(t);
+    });
+  });
+
   trackListEl.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
@@ -123,6 +135,7 @@ function bindTrackEvents() {
         if (path) await sb.storage.from('audio-tracks').remove([path]);
       }
       await sb.from('tracks').delete().eq('id', btn.dataset.id);
+      if (editingId === btn.dataset.id) cancelEdit();
       await loadTracks();
     });
   });
@@ -160,7 +173,8 @@ function playTrack(t) {
   playerTitle.textContent  = t.title;
   playerArtist.textContent = t.artist_name || 'mikihoo';
   playerBar.classList.add('visible');
-  renderTracks();              // 재생 중 항목 강조 갱신
+  setWeatherTone(t.weather_tag);     // 비주얼라이저 톤 전환
+  renderTracks();                    // 재생 중 항목 강조 갱신
   ensureAudioGraph();
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   audioEl.play().catch(err => console.warn('[sound] play failed', err));
@@ -202,7 +216,7 @@ function fmtTime(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// ── 오디오 분석 파이프라인 (1단계: 데이터 추출만) ──
+// ── 오디오 분석 파이프라인 ──
 let audioCtx = null, analyser = null, srcNode = null, freqData = null;
 
 function ensureAudioGraph() {
@@ -215,7 +229,6 @@ function ensureAudioGraph() {
     srcNode.connect(analyser);
     analyser.connect(audioCtx.destination);
     freqData  = new Uint8Array(analyser.frequencyBinCount);
-    // 2단계 시각화에서 꺼내 쓸 수 있게 전역 노출
     window.__audioAnalyser = analyser;
     window.__audioFreq     = freqData;
   } catch (e) {
@@ -223,36 +236,212 @@ function ensureAudioGraph() {
   }
 }
 
-// ── 비주얼라이저 캔버스 (1단계: 전체 크기 배치 + 프레임마다 데이터 추출) ──
-function sizeVisualizer() {
-  if (!visCanvas) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  visCanvas.width  = Math.floor(window.innerWidth  * dpr);
-  visCanvas.height = Math.floor(window.innerHeight * dpr);
-}
-sizeVisualizer();
-window.addEventListener('resize', sizeVisualizer);
+// ══════════════════════════════════════════════════════════════════════
+// WebGL 셰이더 비주얼라이저 (OGL)
+//   격자 도트 패턴 + 주파수 텍스처 매핑. 저음=중심, 고음=외곽.
+//   색: #a8a89e ~ #e8e4dc.  날씨 태그로 톤/노이즈/밀도/흔들림 보정.
+//   새벽 4시 모니터 빛 — 미세하게 살아있는 텍스처.
+// ══════════════════════════════════════════════════════════════════════
+const FREQ_N = 256;
+const freqTexData = new Uint8Array(FREQ_N);
+let playingEnv = 0;     // 0..1, 일시정지 시 0.5s decay
 
-function visLoop() {
-  requestAnimationFrame(visLoop);
+// 색 (정규화)
+const COL_LOW  = [0.659, 0.659, 0.620];  // #a8a89e
+const COL_HIGH = [0.910, 0.894, 0.863];  // #e8e4dc
+
+// 날씨별 비주얼 파라미터
+function weatherVizParams(tag) {
+  switch (tag) {
+    case '01d': return { tone: [1.06, 1.02, 0.94], noise: 0.020, density: 62, jitter: 0.018 }; // 맑음: 밝고 따뜻
+    case '10d':                                                                                  // 비
+    case '50d': return { tone: [0.82, 0.88, 1.02], noise: 0.075, density: 64, jitter: 0.030 }; // 비/안개: 어둡고 차갑게, 노이즈↑
+    case '13d': return { tone: [1.00, 1.03, 1.07], noise: 0.030, density: 96, jitter: 0.016 }; // 눈: 밝고 촘촘
+    case 'wind':                                                                                 // 바람
+    case '04d': return { tone: [0.95, 0.95, 0.95], noise: 0.030, density: 64, jitter: 0.060 }; // 바람/흐림: 흔들림↑
+    default:    return { tone: [1.00, 1.00, 1.00], noise: 0.022, density: 64, jitter: 0.020 };
+  }
+}
+// 현재 / 목표 (전환 시 부드럽게 lerp)
+const VP  = weatherVizParams(null);
+const VPt = weatherVizParams(null);
+function setWeatherTone(tag) {
+  const p = weatherVizParams(tag);
+  VPt.tone = p.tone; VPt.noise = p.noise; VPt.density = p.density; VPt.jitter = p.jitter;
+}
+
+const VIZ_VERT = /* glsl */`
+attribute vec2 position;
+attribute vec2 uv;
+varying vec2 vUv;
+void main() { vUv = uv; gl_Position = vec4(position, 0.0, 1.0); }`;
+
+const VIZ_FRAG = /* glsl */`
+precision highp float;
+uniform float uTime;
+uniform sampler2D uFreq;   // 256x1, 주파수 진폭 (.r)
+uniform float uAudio;      // 재생 반응 envelope 0..1
+uniform vec3  uColLow;
+uniform vec3  uColHigh;
+uniform vec3  uToneMul;    // 날씨 톤 보정
+uniform float uNoiseAmt;   // 날씨 그레인 강도
+uniform float uDensity;    // 격자 밀도
+uniform float uJitter;     // 미세 흔들림 (바람)
+uniform vec2  uRes;
+varying vec2 vUv;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+void main() {
+  vec2 uv = vUv;
+  vec2 p  = uv * 2.0 - 1.0;
+  p.x *= uRes.x / uRes.y;
+  float r = clamp(length(p) / 1.414, 0.0, 1.0);   // 중심 0 → 외곽 1
+
+  // 격자 셀 (위치는 거의 고정)
+  vec2 g    = uv * uDensity;
+  vec2 cell = floor(g);
+  float rnd = hash(cell);
+
+  // 바람: 셀 단위 느린 흔들림
+  vec2 jit = vec2(sin(uTime * 0.7 + rnd * 6.2832),
+                  cos(uTime * 0.6 + rnd * 6.2832)) * uJitter;
+  vec2 f   = fract(g) - 0.5 - jit;
+  float dotShape = smoothstep(0.45, 0.12, length(f));
+
+  // 주파수: 반지름 → 인덱스 (저음 중심, 고음 외곽)
+  float freqVal = texture2D(uFreq, vec2(r, 0.5)).r;
+
+  // 오디오 없이도 살아있는 느린 명멸
+  float base   = 0.10 + 0.05 * sin(uTime * 0.5 + rnd * 40.0);
+  float bright = base + freqVal * uAudio * 1.3;
+  bright *= 0.55 + 0.45 * rnd;
+
+  // 날씨별 그레인 플리커
+  float grain = (hash(cell + floor(uTime * 6.0)) - 0.5) * uNoiseAmt;
+  bright = clamp(bright + grain, 0.0, 1.0);
+
+  vec3 col = mix(uColLow, uColHigh, bright) * uToneMul;
+  float alpha = dotShape * bright;
+  alpha *= smoothstep(1.05, 0.2, r);   // 외곽 소프트 페이드 (사각 경계 숨김)
+
+  // 불투명 캔버스에 배경(#0f0f0f) 위로 빛을 가산 — 페이지 배경과 이음새 없음
+  vec3 bg = vec3(0.059);
+  gl_FragColor = vec4(bg + col * alpha, 1.0);
+}`;
+
+let vizRenderer, vizGl, vizProgram, vizMesh, freqTexture, vizOK = false;
+
+function desiredVizSize() {
+  const isMob = window.innerWidth <= 768;
+  const wPct = isMob ? 0.50 : 0.68;
+  const hPct = isMob ? 0.50 : 0.60;
+  return { w: Math.round(window.innerWidth * wPct), h: Math.round(window.innerHeight * hPct) };
+}
+
+function sizeVisualizer() {
+  if (!vizRenderer) return;
+  const { w, h } = desiredVizSize();
+  vizRenderer.setSize(w, h);
+  vizProgram.uniforms.uRes.value = [w, h];
+}
+
+function initVisualizer() {
+  try {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    vizRenderer = new Renderer({ canvas: visCanvas, alpha: false, antialias: false, dpr });
+    vizGl = vizRenderer.gl;
+
+    freqTexture = new Texture(vizGl, {
+      image: freqTexData, width: FREQ_N, height: 1,
+      format: vizGl.LUMINANCE, internalFormat: vizGl.LUMINANCE, type: vizGl.UNSIGNED_BYTE,
+      generateMipmaps: false,
+      minFilter: vizGl.LINEAR, magFilter: vizGl.LINEAR,
+      wrapS: vizGl.CLAMP_TO_EDGE, wrapT: vizGl.CLAMP_TO_EDGE,
+      flipY: false,
+    });
+
+    vizProgram = new Program(vizGl, {
+      vertex: VIZ_VERT, fragment: VIZ_FRAG,
+      uniforms: {
+        uTime:     { value: 0 },
+        uFreq:     { value: freqTexture },
+        uAudio:    { value: 0 },
+        uColLow:   { value: COL_LOW },
+        uColHigh:  { value: COL_HIGH },
+        uToneMul:  { value: VP.tone },
+        uNoiseAmt: { value: VP.noise },
+        uDensity:  { value: VP.density },
+        uJitter:   { value: VP.jitter },
+        uRes:      { value: [1, 1] },
+      },
+    });
+
+    vizMesh = new Mesh(vizGl, { geometry: new Triangle(vizGl), program: vizProgram });
+    sizeVisualizer();
+    window.addEventListener('resize', sizeVisualizer);
+    vizOK = true;
+  } catch (e) {
+    console.warn('[sound] visualizer init failed', e);
+    vizOK = false;
+  }
+}
+
+function renderViz(dt) {
+  if (!vizOK) return;
+
+  // 재생 반응 envelope (일시정지 시 0.5s decay)
+  const target = (currentTrack && !audioEl.paused) ? 1 : 0;
+  playingEnv += (target - playingEnv) * Math.min(1, dt / 0.5);
+
+  // 날씨 파라미터 부드러운 전환
+  const lp = Math.min(1, dt / 0.6);
+  for (let i = 0; i < 3; i++) VP.tone[i] += (VPt.tone[i] - VP.tone[i]) * lp;
+  VP.noise   += (VPt.noise   - VP.noise)   * lp;
+  VP.density += (VPt.density - VP.density) * lp;
+  VP.jitter  += (VPt.jitter  - VP.jitter)  * lp;
+
+  // 주파수 텍스처 갱신
+  if (freqData) freqTexData.set(freqData); else freqTexData.fill(0);
+  freqTexture.image = freqTexData;
+  freqTexture.needsUpdate = true;
+
+  const u = vizProgram.uniforms;
+  u.uTime.value   += dt;
+  u.uAudio.value   = playingEnv;
+  u.uToneMul.value = VP.tone;
+  u.uNoiseAmt.value = VP.noise;
+  u.uDensity.value = VP.density;
+  u.uJitter.value  = VP.jitter;
+
+  vizRenderer.render({ scene: vizMesh });
+}
+
+// ── 메인 루프 ──
+let lastTs = null;
+function loop(ts) {
+  requestAnimationFrame(loop);
+  const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0.016;
+  lastTs = ts;
+
   if (analyser && freqData) {
     analyser.getByteFrequencyData(freqData);
-    window.__audioFreq = freqData;             // 매 프레임 최신 주파수 배열 저장
-    if (window.__soundDebug) {
-      let sum = 0;
-      for (let i = 0; i < freqData.length; i++) sum += freqData[i];
-      console.log('[sound] avg freq:', (sum / freqData.length).toFixed(1));
-    }
+    window.__audioFreq = freqData;
   }
-  // 1단계: 배경만 (그레인만 보이는 상태). 실제 그리기는 2단계에서.
-  const ctx = visCanvas.getContext('2d');
-  ctx.clearRect(0, 0, visCanvas.width, visCanvas.height);
+  renderViz(dt);
 }
-requestAnimationFrame(visLoop);
 
-// ── 어드민: 업로드 ──
+// ── 어드민: 업로드 / 수정 ──
+let editingId = null;
+
+// 편집 핸들러는 admin 블록 안에서 실제 구현이 연결됨 (비-admin이면 no-op)
+let startEditImpl = null, cancelEditImpl = null;
+function startEdit(t) { if (startEditImpl) startEditImpl(t); }
+function cancelEdit() { if (cancelEditImpl) cancelEditImpl(); }
+
 if (isAdmin) {
   const uploadSection = document.getElementById('uploadSection');
+  const uploadLabel   = document.getElementById('uploadLabel');
   const adminLogin    = document.getElementById('soundAdminLogin');
   const sLoginBtn     = document.getElementById('sLoginBtn');
   const sLoginStatus  = document.getElementById('sLoginStatus');
@@ -262,11 +451,11 @@ if (isAdmin) {
   const trackFile     = document.getElementById('trackFile');
   const trackFileName = document.getElementById('trackFileName');
   const uploadBtn     = document.getElementById('uploadBtn');
+  const uploadCancel  = document.getElementById('uploadCancelBtn');
   const uploadStatus  = document.getElementById('uploadStatus');
 
   uploadSection.style.display = 'block';
 
-  // 세션 확인 → 미로그인 시 로그인 폼
   sb.auth.getSession().then(({ data }) => {
     if (!data.session) adminLogin.style.display = 'block';
   });
@@ -295,55 +484,102 @@ if (isAdmin) {
     trackFileName.textContent = trackFile.files[0] ? trackFile.files[0].name : '';
   });
 
+  // 수정 시작 — 업로드 폼을 편집 모드로 전환
+  function _startEdit(t) {
+    editingId = t.id;
+    trackTitle.value   = t.title || '';
+    trackArtist.value  = t.artist_name || '';
+    trackWeather.value = t.weather_tag || '01d';
+    trackFile.value    = '';
+    trackFileName.textContent = '';
+    uploadLabel.textContent = '음원 수정';
+    uploadBtn.textContent   = '수정 저장';
+    uploadCancel.style.display = 'inline-block';
+    uploadStatus.textContent = '파일은 교체할 때만 선택하세요.';
+    uploadSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  startEditImpl = _startEdit;
+
+  function resetForm() {
+    editingId = null;
+    trackTitle.value = '';
+    trackArtist.value = '';
+    trackWeather.value = '01d';
+    trackFile.value = '';
+    trackFileName.textContent = '';
+    uploadLabel.textContent = '새 음원';
+    uploadBtn.textContent   = '업로드';
+    uploadCancel.style.display = 'none';
+    uploadStatus.textContent = '';
+  }
+  cancelEditImpl = resetForm;
+
+  uploadCancel.addEventListener('click', resetForm);
+
   uploadBtn.addEventListener('click', async () => {
     const title  = trackTitle.value.trim();
     const artist = trackArtist.value.trim();
     const wtag   = trackWeather.value;
     const file   = trackFile.files[0];
 
-    if (!title)  { uploadStatus.textContent = '곡 제목을 입력하세요.'; return; }
-    if (!file)   { uploadStatus.textContent = '파일을 선택하세요.';   return; }
+    if (!title) { uploadStatus.textContent = '곡 제목을 입력하세요.'; return; }
+    if (!editingId && !file) { uploadStatus.textContent = '파일을 선택하세요.'; return; }
 
     uploadBtn.disabled = true;
-    uploadStatus.textContent = '업로드 중…';
+    uploadStatus.textContent = editingId ? '저장 중…' : '업로드 중…';
 
-    const ext  = (file.name.split('.').pop() || 'mp3').toLowerCase();
-    const path = `tracks/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-    const { error: upErr } = await sb.storage
-      .from('audio-tracks')
-      .upload(path, file, { contentType: file.type || 'audio/mpeg', upsert: false });
-    if (upErr) {
-      uploadStatus.textContent = `업로드 실패: ${upErr.message}`;
-      uploadBtn.disabled = false;
-      return;
+    // 파일이 있으면 업로드 (신규 또는 교체)
+    let fileUrl = null;
+    if (file) {
+      const ext  = (file.name.split('.').pop() || 'mp3').toLowerCase();
+      const path = `tracks/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await sb.storage
+        .from('audio-tracks')
+        .upload(path, file, { contentType: file.type || 'audio/mpeg', upsert: false });
+      if (upErr) {
+        uploadStatus.textContent = `업로드 실패: ${upErr.message}`;
+        uploadBtn.disabled = false;
+        return;
+      }
+      fileUrl = sb.storage.from('audio-tracks').getPublicUrl(path).data.publicUrl;
     }
 
-    const fileUrl = sb.storage.from('audio-tracks').getPublicUrl(path).data.publicUrl;
-
-    // 새 곡은 목록 맨 아래로 (maxOrder + 1)
-    const maxOrder = tracks.length ? Math.max(...tracks.map(t => t.order_index ?? 0)) : 0;
-
-    const { error: insErr } = await sb.from('tracks').insert({
-      title,
-      artist_name: artist || 'mikihoo',
-      file_url: fileUrl,
-      weather_tag: wtag,
-      order_index: maxOrder + 1,
-    });
-    if (insErr) {
-      uploadStatus.textContent = `저장 실패: ${insErr.message}`;
-      uploadBtn.disabled = false;
-      return;
+    if (editingId) {
+      // ── 수정 ──
+      const patch = { title, artist_name: artist || 'mikihoo', weather_tag: wtag };
+      if (fileUrl) {
+        const old = tracks.find(t => t.id === editingId);
+        if (old && old.file_url) {
+          const oldPath = storagePathFromUrl(old.file_url);
+          if (oldPath) await sb.storage.from('audio-tracks').remove([oldPath]);
+        }
+        patch.file_url = fileUrl;
+      }
+      const { error: updErr } = await sb.from('tracks').update(patch).eq('id', editingId);
+      if (updErr) {
+        uploadStatus.textContent = `저장 실패: ${updErr.message}`;
+        uploadBtn.disabled = false;
+        return;
+      }
+    } else {
+      // ── 신규 ──
+      const maxOrder = tracks.length ? Math.max(...tracks.map(t => t.order_index ?? 0)) : 0;
+      const { error: insErr } = await sb.from('tracks').insert({
+        title, artist_name: artist || 'mikihoo', file_url: fileUrl,
+        weather_tag: wtag, order_index: maxOrder + 1,
+      });
+      if (insErr) {
+        uploadStatus.textContent = `저장 실패: ${insErr.message}`;
+        uploadBtn.disabled = false;
+        return;
+      }
     }
 
-    uploadStatus.textContent = '완료';
-    trackTitle.value = '';
-    trackArtist.value = '';
-    trackFile.value = '';
-    trackFileName.textContent = '';
     uploadBtn.disabled = false;
+    resetForm();
+    uploadStatus.textContent = '완료';
     await loadTracks();
+    setTimeout(() => { if (uploadStatus.textContent === '완료') uploadStatus.textContent = ''; }, 1500);
   });
 }
 
@@ -363,4 +599,6 @@ function storagePathFromUrl(url) {
 }
 
 // ── init ──
+initVisualizer();
+requestAnimationFrame(loop);
 loadTracks();
