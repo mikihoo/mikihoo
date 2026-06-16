@@ -19,9 +19,15 @@ const seekBar      = document.getElementById('seekBar');
 const curTimeEl    = document.getElementById('curTime');
 const durTimeEl    = document.getElementById('durTime');
 const visCanvas    = document.getElementById('visualizer');
+const listSection  = document.getElementById('listSection');
+const collapsedRow = document.getElementById('collapsedRow');
+const collapsedTitle = document.getElementById('collapsedTitle');
 
 let tracks       = [];
 let currentTrack = null;
+
+// 곡 선택 시 목록을 한 줄로 축소, 클릭하면 다시 펼침
+collapsedRow.addEventListener('click', () => listSection.classList.remove('collapsed'));
 
 // 날씨 태그: 저장값(code) ↔ 라벨
 const WEATHER_TAGS = {
@@ -173,6 +179,8 @@ function playTrack(t) {
   playerTitle.textContent  = t.title;
   playerArtist.textContent = t.artist_name || 'mikihoo';
   playerBar.classList.add('visible');
+  collapsedTitle.textContent = t.title;
+  listSection.classList.add('collapsed');   // 재생 시작 → 목록 축소
   setWeatherTone(t.weather_tag);     // 비주얼라이저 톤 전환
   renderTracks();                    // 재생 중 항목 강조 갱신
   ensureAudioGraph();
@@ -246,21 +254,34 @@ const FREQ_N = 256;
 const freqTexData = new Uint8Array(FREQ_N);
 let playingEnv = 0;     // 0..1, 일시정지 시 0.5s decay
 
+// RMS 볼륨 + 비트 감지 상태
+let rmsEnv = 0;         // 0..1 smoothed (× env)
+let bassEma = 0;        // 적응형 비트 threshold용 저음 EMA
+let beatPulse = 0;      // 0..1, 비트 순간 1 → 0.2s decay
+let beatCooldown = 0;
+
 // 색 (정규화)
 const COL_LOW  = [0.659, 0.659, 0.620];  // #a8a89e
 const COL_HIGH = [0.910, 0.894, 0.863];  // #e8e4dc
 
-// 날씨별 비주얼 파라미터
+// 격자 밀도: 모바일은 GPU 부담 고려해 데스크탑보다 약간 덜 촘촘
+const VIZ_MOBILE  = window.innerWidth <= 768;
+const DENS_FACTOR = VIZ_MOBILE ? 0.7 : 1.0;
+
+// 날씨별 비주얼 파라미터 (density는 이전 대비 약 2배 = 셀 절반 크기)
 function weatherVizParams(tag) {
+  let p;
   switch (tag) {
-    case '01d': return { tone: [1.06, 1.02, 0.94], noise: 0.020, density: 62, jitter: 0.018 }; // 맑음: 밝고 따뜻
-    case '10d':                                                                                  // 비
-    case '50d': return { tone: [0.82, 0.88, 1.02], noise: 0.075, density: 64, jitter: 0.030 }; // 비/안개: 어둡고 차갑게, 노이즈↑
-    case '13d': return { tone: [1.00, 1.03, 1.07], noise: 0.030, density: 96, jitter: 0.016 }; // 눈: 밝고 촘촘
-    case 'wind':                                                                                 // 바람
-    case '04d': return { tone: [0.95, 0.95, 0.95], noise: 0.030, density: 64, jitter: 0.060 }; // 바람/흐림: 흔들림↑
-    default:    return { tone: [1.00, 1.00, 1.00], noise: 0.022, density: 64, jitter: 0.020 };
+    case '01d': p = { tone: [1.06, 1.02, 0.94], noise: 0.020, density: 120, jitter: 0.018 }; break; // 맑음: 밝고 따뜻
+    case '10d':                                                                                       // 비
+    case '50d': p = { tone: [0.82, 0.88, 1.02], noise: 0.075, density: 128, jitter: 0.030 }; break; // 비/안개: 어둡고 차갑게, 노이즈↑
+    case '13d': p = { tone: [1.00, 1.03, 1.07], noise: 0.030, density: 180, jitter: 0.016 }; break; // 눈: 밝고 촘촘
+    case 'wind':                                                                                      // 바람
+    case '04d': p = { tone: [0.95, 0.95, 0.95], noise: 0.030, density: 128, jitter: 0.060 }; break; // 바람/흐림: 흔들림↑
+    default:    p = { tone: [1.00, 1.00, 1.00], noise: 0.022, density: 128, jitter: 0.020 };
   }
+  p.density = Math.round(p.density * DENS_FACTOR);
+  return p;
 }
 // 현재 / 목표 (전환 시 부드럽게 lerp)
 const VP  = weatherVizParams(null);
@@ -281,6 +302,8 @@ precision highp float;
 uniform float uTime;
 uniform sampler2D uFreq;   // 256x1, 주파수 진폭 (.r)
 uniform float uAudio;      // 재생 반응 envelope 0..1
+uniform float uRms;        // 전체 볼륨 0..1
+uniform float uPulse;      // 비트 펄스 0..1
 uniform vec3  uColLow;
 uniform vec3  uColHigh;
 uniform vec3  uToneMul;    // 날씨 톤 보정
@@ -307,7 +330,9 @@ void main() {
   vec2 jit = vec2(sin(uTime * 0.7 + rnd * 6.2832),
                   cos(uTime * 0.6 + rnd * 6.2832)) * uJitter;
   vec2 f   = fract(g) - 0.5 - jit;
-  float dotShape = smoothstep(0.45, 0.12, length(f));
+  // 도트 크기: RMS 볼륨에 따라 확장 (조용하면 작게, 크면 크게)
+  float dotR = 0.30 + uRms * 0.25;
+  float dotShape = smoothstep(dotR, 0.10, length(f));
 
   // 주파수: 반지름 → 인덱스 (저음 중심, 고음 외곽)
   float freqVal = texture2D(uFreq, vec2(r, 0.5)).r;
@@ -316,6 +341,8 @@ void main() {
   float base   = 0.10 + 0.05 * sin(uTime * 0.5 + rnd * 40.0);
   float bright = base + freqVal * uAudio * 1.3;
   bright *= 0.55 + 0.45 * rnd;
+  bright *= 1.0 + uRms * 0.9;        // 전체 볼륨 → 밝기 스케일
+  bright += uPulse * 0.45;           // 비트 펄스 → 순간 밝기 증가
 
   // 날씨별 그레인 플리커
   float grain = (hash(cell + floor(uTime * 6.0)) - 0.5) * uNoiseAmt;
@@ -367,6 +394,8 @@ function initVisualizer() {
         uTime:     { value: 0 },
         uFreq:     { value: freqTexture },
         uAudio:    { value: 0 },
+        uRms:      { value: 0 },
+        uPulse:    { value: 0 },
         uColLow:   { value: COL_LOW },
         uColHigh:  { value: COL_HIGH },
         uToneMul:  { value: VP.tone },
@@ -387,12 +416,41 @@ function initVisualizer() {
   }
 }
 
+// RMS 볼륨 평균 + 적응형 비트 감지
+function analyzeAudio(dt) {
+  if (!freqData) {
+    rmsEnv    += (0 - rmsEnv) * Math.min(1, dt / 0.3);
+    beatPulse  = Math.max(0, beatPulse - dt / 0.2);
+    return;
+  }
+  // 전체 RMS
+  let sumSq = 0;
+  for (let i = 0; i < freqData.length; i++) { const v = freqData[i] / 255; sumSq += v * v; }
+  const rmsInst = Math.sqrt(sumSq / freqData.length) * playingEnv;
+  rmsEnv += (rmsInst - rmsEnv) * Math.min(1, dt / 0.12);
+
+  // 저음 에너지 → 적응형 threshold 비트 감지
+  let bsum = 0; const BN = 12;
+  for (let i = 0; i < BN; i++) bsum += freqData[i] / 255;
+  const bass = (bsum / BN) * playingEnv;
+  bassEma += (bass - bassEma) * 0.08;
+  beatCooldown -= dt;
+  if (bass > bassEma * 1.45 + 0.06 && beatCooldown <= 0) {
+    beatPulse = 1;
+    beatCooldown = 0.12;   // 연속 오탐 방지
+  }
+  beatPulse = Math.max(0, beatPulse - dt / 0.2);   // 0.2s decay
+}
+
 function renderViz(dt) {
   if (!vizOK) return;
 
   // 재생 반응 envelope (일시정지 시 0.5s decay)
   const target = (currentTrack && !audioEl.paused) ? 1 : 0;
   playingEnv += (target - playingEnv) * Math.min(1, dt / 0.5);
+
+  // RMS 볼륨 + 비트 감지
+  analyzeAudio(dt);
 
   // 날씨 파라미터 부드러운 전환
   const lp = Math.min(1, dt / 0.6);
@@ -409,6 +467,8 @@ function renderViz(dt) {
   const u = vizProgram.uniforms;
   u.uTime.value   += dt;
   u.uAudio.value   = playingEnv;
+  u.uRms.value     = rmsEnv;
+  u.uPulse.value   = beatPulse;
   u.uToneMul.value = VP.tone;
   u.uNoiseAmt.value = VP.noise;
   u.uDensity.value = VP.density;
