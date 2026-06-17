@@ -18,6 +18,7 @@
       overflow: hidden;
       cursor: pointer;
       background: #0f0f0f;
+      aspect-ratio: 3 / 4;
     }
 
     .artist-card img {
@@ -240,7 +241,6 @@
     const MAX_COLS = 4;
     const cols = Math.min(artists.length, MAX_COLS);
     const isMobile = window.innerWidth <= 768;
-    const height = artists.length <= MAX_COLS ? (isMobile ? '60vh' : '100vh') : '60vh';
 
     if (isMobile) {
       const cardW = Math.round(window.innerWidth * 0.88);
@@ -253,7 +253,6 @@
     artists.forEach((artist, idx) => {
       const card = document.createElement('div');
       card.className = 'artist-card' + (artist.photo ? '' : ' no-photo');
-      card.style.height = height;
       card.dataset.idx = idx;
 
       if (artist.photo) {
