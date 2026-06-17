@@ -26,8 +26,8 @@ const collapsedTitle = document.getElementById('collapsedTitle');
 let tracks       = [];
 let currentTrack = null;
 
-// 곡 선택 시 목록을 한 줄로 축소, 클릭하면 다시 펼침
-collapsedRow.addEventListener('click', () => listSection.classList.remove('collapsed'));
+// 재생 중 곡 한 줄(제목 영역) 클릭 → 목록 펼치기/다시 축소 토글
+collapsedRow.addEventListener('click', () => listSection.classList.toggle('collapsed'));
 
 // 날씨 태그: 저장값(code) ↔ 라벨
 const WEATHER_TAGS = {
@@ -180,7 +180,8 @@ function playTrack(t) {
   playerArtist.textContent = t.artist_name || 'mikihoo';
   playerBar.classList.add('visible');
   collapsedTitle.textContent = t.title;
-  listSection.classList.add('collapsed');   // 재생 시작 → 목록 축소
+  listSection.classList.add('has-track');   // now-playing 줄 노출
+  listSection.classList.add('collapsed');   // 재생 시작/다른 곡 선택 → 목록 축소
   setWeatherTone(t.weather_tag);     // 비주얼라이저 톤 전환
   renderTracks();                    // 재생 중 항목 강조 갱신
   ensureAudioGraph();
@@ -321,8 +322,10 @@ void main() {
   p.x *= uRes.x / uRes.y;
   float r = clamp(length(p) / 1.414, 0.0, 1.0);   // 중심 0 → 외곽 1
 
-  // 격자 셀 (위치는 거의 고정)
-  vec2 g    = uv * uDensity;
+  // 격자 셀 (위치는 거의 고정). 가로:세로 비율 보정으로 셀을 정사각형 유지
+  // → 캔버스가 와이드해도 도트가 타원으로 늘어지지 않음. uDensity = 가로 셀 수.
+  float aspect = uRes.x / uRes.y;
+  vec2 g    = vec2(uv.x * uDensity, uv.y * uDensity / aspect);
   vec2 cell = floor(g);
   float rnd = hash(cell);
 
@@ -361,7 +364,8 @@ let vizRenderer, vizGl, vizProgram, vizMesh, freqTexture, vizOK = false;
 
 function desiredVizSize() {
   const isMob = window.innerWidth <= 768;
-  const wPct = isMob ? 0.50 : 0.68;
+  // 모바일: 가로 꽉 채움(100%), 세로는 적절히. 데스크탑: 기존 유지.
+  const wPct = isMob ? 1.00 : 0.68;
   const hPct = isMob ? 0.50 : 0.60;
   return { w: Math.round(window.innerWidth * wPct), h: Math.round(window.innerHeight * hPct) };
 }
