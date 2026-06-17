@@ -958,29 +958,6 @@ a { color: inherit; text-decoration: none; }
   transition: max-height 0.4s ease, opacity 0.4s ease;
 }
 
-/* 재생 중 now-playing 한 줄 (클릭하면 목록 토글 — cursor만, 과한 표시 없음) */
-.collapsed-row {
-  display: none;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 1.15rem 0.4rem;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-}
-.collapsed-title {
-  font-family: 'EB Garamond', 'Noto Serif KR', serif;
-  font-size: 1.02rem;
-  color: var(--accent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sound-list-section.has-track .collapsed-row { display: flex; }
-.sound-list-section.collapsed .track-list {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-}
 
 .track-item {
   display: grid;

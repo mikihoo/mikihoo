@@ -20,8 +20,6 @@ const curTimeEl    = document.getElementById('curTime');
 const durTimeEl    = document.getElementById('durTime');
 const visCanvas    = document.getElementById('visualizer');
 const listSection  = document.getElementById('listSection');
-const collapsedRow = document.getElementById('collapsedRow');
-const collapsedTitle = document.getElementById('collapsedTitle');
 const repeatOneBtn = document.getElementById('repeatOneBtn');
 const repeatAllBtn = document.getElementById('repeatAllBtn');
 
@@ -29,9 +27,6 @@ let tracks       = [];
 let currentTrack = null;
 let activeFilterTag = 'all';
 let repeatMode      = 'none'; // 'none' | 'one' | 'all'
-
-// 재생 중 곡 한 줄(제목 영역) 클릭 → 목록 펼치기/다시 축소 토글
-collapsedRow.addEventListener('click', () => listSection.classList.toggle('collapsed'));
 
 // 날씨 필터 탭
 document.getElementById('weatherFilter').addEventListener('click', e => {
@@ -216,9 +211,6 @@ function playTrack(t) {
   playerTitle.textContent  = t.title;
   playerArtist.textContent = t.artist_name || 'mikihoo';
   playerBar.classList.add('visible');
-  collapsedTitle.textContent = t.title;
-  listSection.classList.add('has-track');   // now-playing 줄 노출
-  listSection.classList.add('collapsed');   // 재생 시작/다른 곡 선택 → 목록 축소
   setWeatherTone(t.weather_tag);     // 비주얼라이저 톤 전환
   renderTracks();                    // 재생 중 항목 강조 갱신
   ensureAudioGraph();
