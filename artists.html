@@ -8,10 +8,15 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="style.css" />
   <style>
+    /* 푸터 바닥 고정 */
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+    body > footer { margin-top: auto; }
+
     .artists-grid {
       display: grid;
       justify-content: center;
       gap: clamp(1.5rem, 4vw, 3.5rem);
+      padding-top: 3.5rem;
       padding-bottom: 3rem;
     }
 
