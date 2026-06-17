@@ -22,12 +22,40 @@ const visCanvas    = document.getElementById('visualizer');
 const listSection  = document.getElementById('listSection');
 const collapsedRow = document.getElementById('collapsedRow');
 const collapsedTitle = document.getElementById('collapsedTitle');
+const repeatOneBtn = document.getElementById('repeatOneBtn');
+const repeatAllBtn = document.getElementById('repeatAllBtn');
 
 let tracks       = [];
 let currentTrack = null;
+let activeFilterTag = 'all';
+let repeatMode      = 'none'; // 'none' | 'one' | 'all'
 
 // 재생 중 곡 한 줄(제목 영역) 클릭 → 목록 펼치기/다시 축소 토글
 collapsedRow.addEventListener('click', () => listSection.classList.toggle('collapsed'));
+
+// 날씨 필터 탭
+document.getElementById('weatherFilter').addEventListener('click', e => {
+  const btn = e.target.closest('.wf-tab');
+  if (!btn) return;
+  activeFilterTag = btn.dataset.tag;
+  document.querySelectorAll('.wf-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTracks();
+});
+
+// 반복 버튼
+function updateRepeatUI() {
+  repeatOneBtn.classList.toggle('active', repeatMode === 'one');
+  repeatAllBtn.classList.toggle('active', repeatMode === 'all');
+}
+repeatOneBtn.addEventListener('click', () => {
+  repeatMode = repeatMode === 'one' ? 'none' : 'one';
+  updateRepeatUI();
+});
+repeatAllBtn.addEventListener('click', () => {
+  repeatMode = repeatMode === 'all' ? 'none' : 'all';
+  updateRepeatUI();
+});
 
 // 날씨 태그: 저장값(code) ↔ 라벨
 const WEATHER_TAGS = {
@@ -71,6 +99,11 @@ function weatherIconSvg(iconCode) {
 }
 
 // ── 곡 목록 ──
+function getFilteredTracks() {
+  if (activeFilterTag === 'all') return tracks;
+  return tracks.filter(t => t.weather_tag === activeFilterTag);
+}
+
 async function loadTracks() {
   const { data, error } = await sb
     .from('tracks')
@@ -86,11 +119,15 @@ async function loadTracks() {
 }
 
 function renderTracks() {
-  if (!tracks.length) {
+  const filtered = getFilteredTracks();
+  if (!filtered.length) {
     trackListEl.innerHTML = `<p class="entries-empty">아직 아무것도 없습니다.</p>`;
     return;
   }
-  trackListEl.innerHTML = tracks.map((t, i) => renderTrack(t, i, tracks.length)).join('');
+  trackListEl.innerHTML = filtered.map(t => {
+    const fullIdx = tracks.indexOf(t);
+    return renderTrack(t, fullIdx, tracks.length);
+  }).join('');
   bindTrackEvents();
 }
 
@@ -201,7 +238,20 @@ playToggle.addEventListener('click', () => {
 
 audioEl.addEventListener('play',  () => { playToggle.textContent = '❚❚'; });
 audioEl.addEventListener('pause', () => { playToggle.textContent = '▶'; });
-audioEl.addEventListener('ended', () => { playToggle.textContent = '▶'; });
+audioEl.addEventListener('ended', () => {
+  playToggle.textContent = '▶';
+  if (repeatMode === 'one') {
+    audioEl.currentTime = 0;
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    audioEl.play().catch(() => {});
+  } else if (repeatMode === 'all') {
+    const playlist = getFilteredTracks();
+    if (!playlist.length) return;
+    const idx = playlist.findIndex(x => x.id === currentTrack?.id);
+    const next = playlist[(idx + 1) % playlist.length];
+    if (next) playTrack(next);
+  }
+});
 
 audioEl.addEventListener('loadedmetadata', () => {
   durTimeEl.textContent = fmtTime(audioEl.duration);
@@ -273,13 +323,13 @@ const DENS_FACTOR = VIZ_MOBILE ? 0.7 : 1.0;
 function weatherVizParams(tag) {
   let p;
   switch (tag) {
-    case '01d': p = { tone: [1.06, 1.02, 0.94], noise: 0.020, density: 120, jitter: 0.018 }; break; // 맑음: 밝고 따뜻
+    case '01d': p = { tone: [1.06, 1.02, 0.94], noise: 0.020, density: 240, jitter: 0.018 }; break; // 맑음: 밝고 따뜻
     case '10d':                                                                                       // 비
-    case '50d': p = { tone: [0.82, 0.88, 1.02], noise: 0.075, density: 128, jitter: 0.030 }; break; // 비/안개: 어둡고 차갑게, 노이즈↑
-    case '13d': p = { tone: [1.00, 1.03, 1.07], noise: 0.030, density: 180, jitter: 0.016 }; break; // 눈: 밝고 촘촘
+    case '50d': p = { tone: [0.82, 0.88, 1.02], noise: 0.075, density: 256, jitter: 0.030 }; break; // 비/안개: 어둡고 차갑게, 노이즈↑
+    case '13d': p = { tone: [1.00, 1.03, 1.07], noise: 0.030, density: 360, jitter: 0.016 }; break; // 눈: 밝고 촘촘
     case 'wind':                                                                                      // 바람
-    case '04d': p = { tone: [0.95, 0.95, 0.95], noise: 0.030, density: 128, jitter: 0.060 }; break; // 바람/흐림: 흔들림↑
-    default:    p = { tone: [1.00, 1.00, 1.00], noise: 0.022, density: 128, jitter: 0.020 };
+    case '04d': p = { tone: [0.95, 0.95, 0.95], noise: 0.030, density: 256, jitter: 0.060 }; break; // 바람/흐림: 흔들림↑
+    default:    p = { tone: [1.00, 1.00, 1.00], noise: 0.022, density: 256, jitter: 0.020 };
   }
   p.density = Math.round(p.density * DENS_FACTOR);
   return p;

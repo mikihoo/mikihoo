@@ -1057,6 +1057,28 @@ a { color: inherit; text-decoration: none; }
 .form-select:focus { border-bottom-color: var(--accent-dim); }
 .form-select option { background: var(--bg); color: var(--text); }
 
+/* ── Weather filter tabs ── */
+.weather-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  padding: 0.85rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.wf-tab {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-family: 'EB Garamond', 'Noto Serif KR', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.3s ease;
+}
+.wf-tab:hover { color: var(--text-dim); }
+.wf-tab.active { color: var(--accent); }
+
 /* ── Bottom player bar ── */
 .player-bar {
   position: fixed;
@@ -1107,6 +1129,11 @@ a { color: inherit; text-decoration: none; }
   text-overflow: ellipsis;
 }
 
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
 .player-toggle {
   background: none;
   border: none;
@@ -1119,6 +1146,18 @@ a { color: inherit; text-decoration: none; }
   transition: color 0.4s ease;
 }
 .player-toggle:hover { color: var(--text); }
+.player-repeat {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.92rem;
+  cursor: pointer;
+  padding: 0.3rem 0.35rem;
+  transition: color 0.3s ease;
+  line-height: 1;
+}
+.player-repeat:hover { color: var(--text-dim); }
+.player-repeat.active { color: var(--accent); }
 
 /* Custom range — thin line, handle hidden until hover */
 .player-seek {
@@ -1173,12 +1212,12 @@ a { color: inherit; text-decoration: none; }
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
       "meta meta meta"
-      "toggle seek time";
+      "controls seek time";
     gap: 0.6rem 1rem;
     padding: 0.8rem 1.2rem;
   }
   .player-meta { grid-area: meta; }
-  .player-toggle { grid-area: toggle; }
+  .player-controls { grid-area: controls; }
   .player-seek { grid-area: seek; }
   .player-time { grid-area: time; }
 }

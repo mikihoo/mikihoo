@@ -44,6 +44,15 @@
       <div class="entries-label-row">
         <div class="entries-label">채음</div>
       </div>
+      <div class="weather-filter" id="weatherFilter">
+        <button class="wf-tab active" data-tag="all">전체</button>
+        <button class="wf-tab" data-tag="01d">맑음</button>
+        <button class="wf-tab" data-tag="10d">비</button>
+        <button class="wf-tab" data-tag="13d">눈</button>
+        <button class="wf-tab" data-tag="50d">안개</button>
+        <button class="wf-tab" data-tag="wind">바람</button>
+        <button class="wf-tab" data-tag="04d">흐림</button>
+      </div>
       <div class="collapsed-row" id="collapsedRow">
         <span class="collapsed-title" id="collapsedTitle"></span>
       </div>
@@ -99,7 +108,11 @@
       <span class="player-track-title" id="playerTitle"></span>
       <span class="player-track-artist" id="playerArtist"></span>
     </div>
-    <button class="player-toggle" id="playToggle" aria-label="재생/일시정지">▶</button>
+    <div class="player-controls">
+      <button class="player-toggle" id="playToggle" aria-label="재생/일시정지">▶</button>
+      <button class="player-repeat" id="repeatOneBtn" aria-label="한 곡 반복" title="한 곡 반복">↩</button>
+      <button class="player-repeat" id="repeatAllBtn" aria-label="전체 반복" title="전체 반복">↺</button>
+    </div>
     <input type="range" class="player-seek" id="seekBar" min="0" max="1000" value="0" step="1" />
     <div class="player-time">
       <span id="curTime">0:00</span>
