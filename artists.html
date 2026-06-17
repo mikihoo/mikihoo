@@ -10,11 +10,9 @@
   <style>
     .artists-grid {
       display: grid;
-      max-width: 84vw;
-      width: 100%;
-      margin: 0 auto;
-      gap: clamp(1rem, 2.5vw, 2.5rem);
-      padding-bottom: 8rem;
+      justify-content: center;
+      gap: clamp(1.5rem, 4vw, 3.5rem);
+      padding-bottom: 3rem;
     }
 
     .artist-card {
@@ -89,9 +87,9 @@
 
     @media (max-width: 768px) {
       .artists-grid {
-        max-width: 90vw;
+        width: 90vw;
         gap: 1.2rem;
-        padding-bottom: 5rem;
+        padding-bottom: 3rem;
       }
       .artist-card {
         height: 60vh;
@@ -252,7 +250,12 @@
     const cols = Math.min(artists.length, MAX_COLS);
     const isMobile = window.innerWidth <= 768;
 
-    grid.style.gridTemplateColumns = isMobile ? '1fr' : `repeat(${cols}, 1fr)`;
+    if (isMobile) {
+      grid.style.gridTemplateColumns = '1fr';
+    } else {
+      const cardW = Math.round(window.innerWidth * 0.80 / MAX_COLS);
+      grid.style.gridTemplateColumns = `repeat(${cols}, ${cardW}px)`;
+    }
 
     artists.forEach((artist, idx) => {
       const card = document.createElement('div');
