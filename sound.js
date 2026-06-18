@@ -5,6 +5,9 @@ import { Renderer, Program, Mesh, Triangle, Texture }
 const SUPABASE_URL = 'https://bemcdwxyxdguhcrgkhth.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbWNkd3h5eGRndWhjcmdraHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMjMzOTgsImV4cCI6MjA5NjU5OTM5OH0.GrPUSR7EKSlOGXVI7gxQnwvQvwZBUcuOi2I9EsbrNxk';
 
+// ── Cloudflare R2 공개 URL (파일 재생용) ──
+const R2_PUBLIC_URL = 'https://pub-941aaefa2376456bbc0093aa25af3344.r2.dev';
+
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const isAdmin = new URLSearchParams(location.search).has('admin');
 
@@ -169,8 +172,9 @@ function bindTrackEvents() {
       if (!confirm('삭제할까요?')) return;
       const t = tracks.find(x => x.id === btn.dataset.id);
       if (t && t.file_url) {
-        const path = storagePathFromUrl(t.file_url);
-        if (path) await sb.storage.from('audio-tracks').remove([path]);
+        await sb.functions.invoke('r2-storage', {
+          body: { action: 'delete', key: t.file_url },
+        });
       }
       await sb.from('tracks').delete().eq('id', btn.dataset.id);
       if (editingId === btn.dataset.id) cancelEdit();
@@ -207,7 +211,7 @@ async function swapOrder(a, b) {
 // ── 플레이어 ──
 function playTrack(t) {
   currentTrack = t;
-  audioEl.src = t.file_url;
+  audioEl.src = t.file_url ? `${R2_PUBLIC_URL}/${t.file_url}` : '';
   playerTitle.textContent  = t.title;
   playerArtist.textContent = t.artist_name || 'mikihoo';
   playerBar.classList.add('visible');
@@ -634,32 +638,49 @@ if (isAdmin) {
     uploadBtn.disabled = true;
     uploadStatus.textContent = editingId ? '저장 중…' : '업로드 중…';
 
-    // 파일이 있으면 업로드 (신규 또는 교체)
-    let fileUrl = null;
+    // 파일이 있으면 R2에 업로드 (presigned URL 방식)
+    let fileKey = null;
     if (file) {
-      const ext  = (file.name.split('.').pop() || 'mp3').toLowerCase();
-      const path = `tracks/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await sb.storage
-        .from('audio-tracks')
-        .upload(path, file, { contentType: file.type || 'audio/mpeg', upsert: false });
-      if (upErr) {
-        uploadStatus.textContent = `업로드 실패: ${upErr.message}`;
+      const ext = (file.name.split('.').pop() || 'mp3').toLowerCase();
+      const key = `tracks/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      // 1단계: Edge Function에서 presigned PUT URL 발급
+      uploadStatus.textContent = '업로드 준비 중…';
+      const { data: fnData, error: fnErr } = await sb.functions.invoke('r2-storage', {
+        body: { action: 'upload', key },
+      });
+      if (fnErr || !fnData?.url) {
+        uploadStatus.textContent = `업로드 실패: ${fnErr?.message || '알 수 없는 오류'}`;
         uploadBtn.disabled = false;
         return;
       }
-      fileUrl = sb.storage.from('audio-tracks').getPublicUrl(path).data.publicUrl;
+
+      // 2단계: presigned URL로 R2에 직접 PUT
+      uploadStatus.textContent = '업로드 중…';
+      const putRes = await fetch(fnData.url, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'audio/mpeg' },
+      });
+      if (!putRes.ok) {
+        uploadStatus.textContent = `업로드 실패: R2 ${putRes.status}`;
+        uploadBtn.disabled = false;
+        return;
+      }
+      fileKey = key;
     }
 
     if (editingId) {
       // ── 수정 ──
       const patch = { title, artist_name: artist || 'mikihoo', weather_tag: wtag };
-      if (fileUrl) {
+      if (fileKey) {
         const old = tracks.find(t => t.id === editingId);
         if (old && old.file_url) {
-          const oldPath = storagePathFromUrl(old.file_url);
-          if (oldPath) await sb.storage.from('audio-tracks').remove([oldPath]);
+          await sb.functions.invoke('r2-storage', {
+            body: { action: 'delete', key: old.file_url },
+          });
         }
-        patch.file_url = fileUrl;
+        patch.file_url = fileKey;
       }
       const { error: updErr } = await sb.from('tracks').update(patch).eq('id', editingId);
       if (updErr) {
@@ -671,7 +692,7 @@ if (isAdmin) {
       // ── 신규 ──
       const maxOrder = tracks.length ? Math.max(...tracks.map(t => t.order_index ?? 0)) : 0;
       const { error: insErr } = await sb.from('tracks').insert({
-        title, artist_name: artist || 'mikihoo', file_url: fileUrl,
+        title, artist_name: artist || 'mikihoo', file_url: fileKey,
         weather_tag: wtag, order_index: maxOrder + 1,
       });
       if (insErr) {
@@ -697,11 +718,6 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-function storagePathFromUrl(url) {
-  const marker = '/audio-tracks/';
-  const idx = url.indexOf(marker);
-  return idx !== -1 ? decodeURIComponent(url.slice(idx + marker.length).split('?')[0]) : null;
 }
 
 // ── init ──
