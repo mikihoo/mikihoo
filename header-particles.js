@@ -41,9 +41,8 @@
     });
     range.detach();
 
-    var canvasW  = Math.ceil(anchorRect.width);
-    var baseline = Math.ceil(fontSize * 1.18);
-    var canvasH  = Math.ceil(fontSize * 3.3); // room for scatter drift
+    var canvasW = Math.ceil(anchorRect.width);
+    var canvasH = Math.ceil(fontSize * 3.3); // room for scatter drift
 
     // ── Sample glyph pixels per character ─────────────────────────
     var sc    = document.createElement('canvas');
@@ -52,6 +51,14 @@
     var sCtx  = sc.getContext('2d');
     sCtx.font      = fontStr;
     sCtx.fillStyle = '#fff';
+
+    // Baseline placed so the text's optical centre sits at canvas centre,
+    // which is itself centred on the anchor — matches the nav's optical centre.
+    var fm      = sCtx.measureText(text);
+    var ascent  = fm.actualBoundingBoxAscent  || fontSize * 0.8;
+    var descent = fm.actualBoundingBoxDescent || fontSize * 0.2;
+    var baseline = Math.round(canvasH / 2 + (ascent - descent) / 2);
+
     charPos.forEach(function (cp) { sCtx.fillText(cp.ch, cp.x, baseline); });
     var raw = sCtx.getImageData(0, 0, canvasW, canvasH).data;
 
@@ -86,10 +93,8 @@
     var rc  = document.createElement('canvas');
     rc.width  = canvasW * dpr;
     rc.height = canvasH * dpr;
-    var yPct = ((baseline / canvasH) * 100).toFixed(1);
     rc.style.cssText =
-      'position:absolute;left:0;top:50%;' +
-      'transform:translateY(-' + yPct + '%);' +
+      'position:absolute;left:0;top:50%;transform:translateY(-50%);' +
       'width:' + canvasW + 'px;height:' + canvasH + 'px;pointer-events:none;';
 
     anchor.classList.add('has-particles');
