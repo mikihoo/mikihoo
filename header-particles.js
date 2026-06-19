@@ -1,13 +1,15 @@
 (function () {
   'use strict';
 
-  var PER_CHAR   = 90;    // particles spawned per character on hover
-  var GRAVITY    = 0.026; // gentle downward pull
-  var DRAG       = 0.984; // air resistance
-  var SPREAD     = 0.85;  // initial dispersion speed
-  var HOVER_EASE = 0.08;  // how fast a char dissolves / reforms
-  var LIFE_MIN   = 100;   // frames a particle drifts before respawning
-  var LIFE_VAR   = 80;
+  var SAMPLE_STEP = 2;     // sample every Nth glyph pixel (smaller = more, finer particles)
+  var DOT         = 0.8;   // particle draw size (css px) — small
+  var EASE        = 0.009; // dissolve / reform speed (very slow ~ 5s)
+  var SCATTER_X   = 24;    // horizontal dispersion (± px)
+  var SCATTER_DN  = 30;    // downward drift on scatter (px)
+  var SCATTER_UP  = 12;    // upward drift on scatter (px)
+  var STAGGER     = 0.4;   // per-particle start spread (organic, non-uniform)
+
+  function ss(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }
 
   function init() {
     var anchor = document.querySelector('a.site-title');
@@ -15,10 +17,7 @@
 
     var cs         = getComputedStyle(anchor);
     var fontSize   = parseFloat(cs.fontSize);
-    var fontFamily = cs.fontFamily;
-    var fontWeight = cs.fontWeight || '400';
-    var fontStr    = fontWeight + ' ' + fontSize + 'px ' + fontFamily;
-
+    var fontStr    = (cs.fontWeight || '400') + ' ' + fontSize + 'px ' + cs.fontFamily;
     var color = getComputedStyle(document.documentElement)
       .getPropertyValue('--text-title').trim() || '#e8e4dc';
 
@@ -44,9 +43,9 @@
 
     var canvasW  = Math.ceil(anchorRect.width);
     var baseline = Math.ceil(fontSize * 1.18);
-    var canvasH  = Math.ceil(fontSize * 2.7);
+    var canvasH  = Math.ceil(fontSize * 3.3); // room for scatter drift
 
-    // ── Sample glyph pixels per character (for particle origins) ──
+    // ── Sample glyph pixels per character ─────────────────────────
     var sc    = document.createElement('canvas');
     sc.width  = canvasW;
     sc.height = canvasH;
@@ -56,40 +55,30 @@
     charPos.forEach(function (cp) { sCtx.fillText(cp.ch, cp.x, baseline); });
     var raw = sCtx.getImageData(0, 0, canvasW, canvasH).data;
 
-    function newParticle(pts, cx, cy) {
-      var src = pts[(Math.random() * pts.length) | 0];
-      var ang = Math.atan2(src.y - cy, src.x - cx) + (Math.random() - 0.5);
-      var sp  = Math.random() * SPREAD;
-      return {
-        ox: src.x, oy: src.y,
-        x:  src.x, y:  src.y,
-        vx: Math.cos(ang) * sp,
-        vy: Math.sin(ang) * sp * 0.5 - 0.05,
-        age: (Math.random() * (LIFE_MIN + LIFE_VAR)) | 0,   // staggered phase
-        life: LIFE_MIN + Math.random() * LIFE_VAR
-      };
-    }
-
-    // ── Build per-character state ─────────────────────────────────
+    // ── Build per-character particle sets ─────────────────────────
     var charState = charPos.map(function (cp) {
-      if (!cp.ch.trim()) return null; // skip spaces / slash region handled below
-
-      var pts = [];
-      var x0  = Math.max(0, Math.floor(cp.x));
-      var x1  = Math.min(canvasW, Math.ceil(cp.x + cp.w));
-      var sx = 0, sy = 0;
-      for (var py = 0; py < canvasH; py++) {
-        for (var px = x0; px < x1; px++) {
-          if (raw[(py * canvasW + px) * 4 + 3] > 40) { pts.push({ x: px, y: py }); sx += px; sy += py; }
-        }
-      }
-      if (!pts.length) return null;
-      var cx = sx / pts.length, cy = sy / pts.length;
+      if (!cp.ch.trim()) return null;
 
       var parts = [];
-      for (var i = 0; i < PER_CHAR; i++) parts.push(newParticle(pts, cx, cy));
-
-      return { pts: pts, cx: cx, cy: cy, parts: parts, hover: 0 };
+      var x0 = Math.max(0, Math.floor(cp.x));
+      var x1 = Math.min(canvasW, Math.ceil(cp.x + cp.w));
+      var k  = 0;
+      for (var py = 0; py < canvasH; py++) {
+        for (var px = x0; px < x1; px++) {
+          if (raw[(py * canvasW + px) * 4 + 3] > 40) {
+            if (k++ % SAMPLE_STEP) continue; // thin out for performance
+            var t0 = Math.random() * STAGGER;
+            parts.push({
+              ox: px, oy: py,
+              sx: px + (Math.random() - 0.5) * 2 * SCATTER_X,
+              sy: py + (Math.random() * (SCATTER_DN + SCATTER_UP) - SCATTER_UP),
+              t0: t0, span: 1 - t0
+            });
+          }
+        }
+      }
+      if (!parts.length) return null;
+      return { parts: parts, hover: 0 };
     });
 
     // ── Render canvas ─────────────────────────────────────────────
@@ -137,51 +126,37 @@
 
       for (var ci = 0; ci < charPos.length; ci++) {
         var st = charState[ci];
+        if (!st) continue;
         var cp = charPos[ci];
 
-        if (!st) continue;
-
-        // ease hover amount toward target
+        // ease char dissolve amount toward target (0 = text, 1 = scattered/gone)
         var target = (ci === hovered) ? 1 : 0;
-        st.hover += (target - st.hover) * HOVER_EASE;
-        if (st.hover < 0.002) st.hover = 0;
+        st.hover += (target - st.hover) * EASE;
+        if (st.hover < 0.001) st.hover = 0;
+        else if (st.hover > 0.999) st.hover = 1;
+        var p = st.hover;
 
-        // crisp glyph (fades out as it dissolves)
-        if (st.hover < 0.999) {
-          ctx.globalAlpha = 1 - st.hover;
+        // crisp glyph — fully visible until ~0.3, gone by ~0.45
+        var ta = 1 - ss((p - 0.05) / 0.4);
+        if (ta > 0.002) {
+          ctx.globalAlpha = ta;
           ctx.fillStyle   = color;
           ctx.fillText(cp.ch, cp.x, baseline);
         }
 
-        // particles (fade in as it dissolves)
-        if (st.hover > 0.002) {
+        // particles — visible only mid-transition; absent at p=0 and p=1
+        if (p > 0.001 && p < 1) {
           ctx.fillStyle = color;
           for (var i = 0; i < st.parts.length; i++) {
-            var p = st.parts[i];
-            p.vy += GRAVITY;
-            p.vx *= DRAG;
-            p.vy *= DRAG;
-            p.x  += p.vx;
-            p.y  += p.vy;
-            p.age++;
-
-            var lifeT = p.age / p.life;
-            if (lifeT >= 1) {
-              // respawn at origin with fresh drift
-              var ang = Math.atan2(p.oy - st.cy, p.ox - st.cx) + (Math.random() - 0.5);
-              var sp  = Math.random() * SPREAD;
-              p.x = p.ox; p.y = p.oy;
-              p.vx = Math.cos(ang) * sp;
-              p.vy = Math.sin(ang) * sp * 0.5 - 0.05;
-              p.age = 0;
-              p.life = LIFE_MIN + Math.random() * LIFE_VAR;
-              lifeT = 0;
-            }
-
-            // fade in over first 15%, out over the rest
-            var a = lifeT < 0.15 ? lifeT / 0.15 : 1 - (lifeT - 0.15) / 0.85;
-            ctx.globalAlpha = st.hover * Math.max(0, a);
-            ctx.fillRect(p.x, p.y, 1, 1);
+            var q  = st.parts[i];
+            var pp = ss((p - q.t0) / q.span);         // staggered per-particle progress
+            if (pp <= 0) continue;
+            var x  = q.ox + (q.sx - q.ox) * pp;
+            var y  = q.oy + (q.sy - q.oy) * pp;
+            // alpha: rise as it detaches, fade out as it fully scatters
+            var a  = pp < 0.45 ? pp / 0.45 : 1 - (pp - 0.45) / 0.55;
+            ctx.globalAlpha = a < 0 ? 0 : a;
+            ctx.fillRect(x, y, DOT, DOT);
           }
         }
       }
