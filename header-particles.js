@@ -5,8 +5,8 @@
   var DOT         = 0.8;   // particle draw size (css px) — small
   var EASE        = 0.009; // desktop hover: dissolve / reform speed (very slow ~ 5s)
   var EASE_TOUCH  = 0.05;  // touch scrub: faster so a finger swipe is visibly responsive
-  var INTRO_EASE   = 0.06; // assemble-on-load speed (mobile intro)
-  var INTRO_STAGGER = 7;   // frames between each character starting to assemble
+  var INTRO_EASE   = 0.042; // assemble-on-load speed (mobile intro)
+  var INTRO_STAGGER = 0;    // 0 = whole logo gathers at once (no per-char sweep)
   var SCATTER_X   = 24;    // horizontal dispersion (± px)
   var SCATTER_DN  = 30;    // downward drift on scatter (px)
   var SCATTER_UP  = 12;    // upward drift on scatter (px)
