@@ -114,6 +114,36 @@ async function loadTracks() {
   }
   tracks = data || [];
   renderTracks();
+  handleTrackParam();
+}
+
+function handleTrackParam() {
+  const id = new URLSearchParams(location.search).get('track');
+  if (!id) return;
+  const t = tracks.find(x => x.id === id);
+  if (!t) return;
+
+  // 플레이어에 로드
+  currentTrack = t;
+  audioEl.src = t.file_url ? `${R2_PUBLIC_URL}/${t.file_url}` : '';
+  playerTitle.textContent  = t.title;
+  playerArtist.textContent = t.artist_name || 'mikihoo';
+  playerBar.classList.add('visible');
+  setWeatherTone(t.weather_tag);
+  renderTracks(); // active 강조
+
+  // 해당 트랙으로 스크롤
+  const el = trackListEl.querySelector(`[data-id="${CSS.escape(id)}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  ensureAudioGraph();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+  // 자동재생 시도 — 실패 시 재생 버튼 펄스
+  audioEl.play().catch(() => {
+    playToggle.classList.add('pulse-hint');
+    setTimeout(() => playToggle.classList.remove('pulse-hint'), 2400);
+  });
 }
 
 function renderTracks() {
@@ -139,11 +169,12 @@ function renderTrack(t, i, total) {
       <button class="ctrl-btn edit-btn"   data-id="${escapeAttr(t.id)}">수정</button>
       <button class="ctrl-btn delete-btn" data-id="${escapeAttr(t.id)}">삭제</button>
     </span>` : '';
+  const shareBtn = `<button class="ctrl-btn share-btn" data-id="${escapeAttr(t.id)}" aria-label="링크 복사" title="링크 복사">↗</button>`;
   return `
     <div class="track-item${playing}" data-id="${escapeAttr(t.id)}">
       <span class="track-icon">${icon}</span>
       <span class="track-title">${escapeHtml(t.title)}</span>
-      <span class="track-artist">${escapeHtml(t.artist_name || 'mikihoo')}${adminControls}</span>
+      <span class="track-artist">${escapeHtml(t.artist_name || 'mikihoo')}${shareBtn}${adminControls}</span>
     </div>`;
 }
 
@@ -153,6 +184,21 @@ function bindTrackEvents() {
       if (e.target.closest('.ctrl-btn')) return;
       const t = tracks.find(x => x.id === el.dataset.id);
       if (t) playTrack(t);
+    });
+  });
+
+  trackListEl.querySelectorAll('.share-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const url = `${location.origin}${location.pathname}?track=${btn.dataset.id}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        btn.textContent = '✓';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '↗'; btn.classList.remove('copied'); }, 1500);
+      } catch {
+        // clipboard 미지원 환경 — 조용히 무시
+      }
     });
   });
 
@@ -215,11 +261,16 @@ function playTrack(t) {
   playerTitle.textContent  = t.title;
   playerArtist.textContent = t.artist_name || 'mikihoo';
   playerBar.classList.add('visible');
-  setWeatherTone(t.weather_tag);     // 비주얼라이저 톤 전환
-  renderTracks();                    // 재생 중 항목 강조 갱신
+  setWeatherTone(t.weather_tag);
+  renderTracks();
   ensureAudioGraph();
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   audioEl.play().catch(err => console.warn('[sound] play failed', err));
+
+  // 주소창 URL 동기화 (히스토리 오염 없이 replace)
+  const params = new URLSearchParams(location.search);
+  params.set('track', t.id);
+  history.replaceState(null, '', `${location.pathname}?${params}`);
 }
 
 playToggle.addEventListener('click', () => {
