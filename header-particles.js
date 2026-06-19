@@ -3,7 +3,8 @@
 
   var SAMPLE_STEP = 2;     // sample every Nth glyph pixel (smaller = more, finer particles)
   var DOT         = 0.8;   // particle draw size (css px) — small
-  var EASE        = 0.009; // dissolve / reform speed (very slow ~ 5s)
+  var EASE        = 0.009; // desktop hover: dissolve / reform speed (very slow ~ 5s)
+  var EASE_TOUCH  = 0.05;  // touch scrub: faster so a finger swipe is visibly responsive
   var SCATTER_X   = 24;    // horizontal dispersion (± px)
   var SCATTER_DN  = 30;    // downward drift on scatter (px)
   var SCATTER_UP  = 12;    // upward drift on scatter (px)
@@ -109,6 +110,12 @@
     ctx.textBaseline = 'alphabetic';
 
     // ── Interaction ───────────────────────────────────────────────
+    // Touch devices scrub faster so a finger swipe reads as responsive;
+    // desktop hover keeps the slow, calm dissolve.
+    var coarse = !!(window.matchMedia &&
+      window.matchMedia('(hover: none), (pointer: coarse)').matches);
+    var ease = coarse ? EASE_TOUCH : EASE;
+
     var hovered = -1;
     function charAt(clientX) {
       var rect = anchor.getBoundingClientRect();
@@ -136,7 +143,7 @@
 
         // ease char dissolve amount toward target (0 = text, 1 = scattered/gone)
         var target = (ci === hovered) ? 1 : 0;
-        st.hover += (target - st.hover) * EASE;
+        st.hover += (target - st.hover) * ease;
         if (st.hover < 0.001) st.hover = 0;
         else if (st.hover > 0.999) st.hover = 1;
         var p = st.hover;

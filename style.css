@@ -59,6 +59,8 @@ a { color: inherit; text-decoration: none; }
   font-weight: 400;
   text-decoration: none;
   transition: opacity 0.5s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .site-title:hover { opacity: 0.6; }
@@ -882,6 +884,10 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 768px) {
   .site-header { padding: 0 1.2rem; }
+
+  /* keep logo + nav on one line on narrow phones */
+  .site-nav { gap: clamp(0.7rem, 3.5vw, 2.4rem); }
+  .site-nav a { white-space: nowrap; }
 
   .footer-admin { display: none; }
 
