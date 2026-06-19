@@ -5,6 +5,8 @@
   var DOT         = 0.8;   // particle draw size (css px) — small
   var EASE        = 0.009; // desktop hover: dissolve / reform speed (very slow ~ 5s)
   var EASE_TOUCH  = 0.05;  // touch scrub: faster so a finger swipe is visibly responsive
+  var INTRO_EASE   = 0.06; // assemble-on-load speed (mobile intro)
+  var INTRO_STAGGER = 7;   // frames between each character starting to assemble
   var SCATTER_X   = 24;    // horizontal dispersion (± px)
   var SCATTER_DN  = 30;    // downward drift on scatter (px)
   var SCATTER_UP  = 12;    // upward drift on scatter (px)
@@ -132,9 +134,30 @@
     anchor.addEventListener('touchmove',  function (e) { hovered = charAt(e.touches[0].clientX); }, { passive: true });
     anchor.addEventListener('touchend',   function ()  { hovered = -1; });
 
+    // ── Intro (mobile): logo assembles from scattered particles on load ──
+    // No hover on touch, so play a one-time left-to-right "gather" sweep.
+    var intro = coarse;
+    var frame = 0, maxHold = 0;
+    if (intro) {
+      var order = 0;
+      for (var ii = 0; ii < charState.length; ii++) {
+        var s = charState[ii];
+        if (!s) continue;
+        s.hover = 1;                       // start fully scattered / invisible
+        s.hold  = order * INTRO_STAGGER;   // staggered assemble start
+        maxHold = s.hold;
+        order++;
+      }
+    }
+
     // ── Animation loop ────────────────────────────────────────────
     function tick() {
       ctx.clearRect(0, 0, canvasW, canvasH);
+
+      if (intro) {
+        frame++;
+        if (frame > maxHold + 90) intro = false; // sweep finished → normal mode
+      }
 
       for (var ci = 0; ci < charPos.length; ci++) {
         var st = charState[ci];
@@ -143,7 +166,12 @@
 
         // ease char dissolve amount toward target (0 = text, 1 = scattered/gone)
         var target = (ci === hovered) ? 1 : 0;
-        st.hover += (target - st.hover) * ease;
+        if (intro && frame < st.hold) {
+          st.hover = 1;                    // hold scattered until this char's turn
+        } else {
+          var r = intro ? INTRO_EASE : ease;
+          st.hover += (target - st.hover) * r;
+        }
         if (st.hover < 0.001) st.hover = 0;
         else if (st.hover > 0.999) st.hover = 1;
         var p = st.hover;
