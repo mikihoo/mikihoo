@@ -20,6 +20,7 @@ const postFileName    = document.getElementById('postFileName');
 const postFilterStatus= document.getElementById('postFilterStatus');
 const multiPreview    = document.getElementById('multiPreview');
 const postModal       = document.getElementById('postModal');
+const modalInner      = postModal ? postModal.querySelector('.modal-inner') : null;
 const modalClose      = document.getElementById('modalClose');
 const modalImages     = document.getElementById('modalImages');
 const modalDate       = document.getElementById('modalDate');
@@ -481,19 +482,166 @@ function openModal(post) {
   modalTitle.textContent   = post.title;
   modalExcerpt.textContent = post.excerpt || '';
   if (modalWeather) modalWeather.textContent = post.weather_text || '';
+
+  // 배경 페이지 스크롤 잠금 (위치 저장)
+  lockBodyScroll();
+
+  // 열기 전 상태 초기화 (스와이프 잔여 transform 제거)
+  modalInner.classList.remove('snap');
+  postModal.classList.remove('snap');
+  modalInner.style.transform = '';
+  postModal.style.background  = '';
+
   postModal.classList.add('open');
-  document.body.style.overflow = 'hidden';
+  postModal.scrollTop = 0;
+
+  // 포커스 이동 (닫을 때 복귀용으로 현재 포커스 저장)
+  lastFocused = document.activeElement;
+  if (modalClose) modalClose.focus({ preventScroll: true });
+
+  // 모바일: 뒤로가기로 닫을 수 있게 히스토리 push
+  if (mqMobile.matches) {
+    history.pushState({ mikihooModal: true }, '');
+    modalHistoryPushed = true;
+  }
 }
 
 function closeModal() {
+  if (!postModal.classList.contains('open')) return;
+
   postModal.classList.remove('open');
-  document.body.style.overflow = '';
+  postModal.classList.remove('snap');
+  modalInner.classList.remove('snap');
+  modalInner.style.transform = '';
+  postModal.style.background  = '';
+
+  unlockBodyScroll();
   modalImages.innerHTML = '';
+
+  // 포커스 원위치 복귀
+  if (lastFocused && typeof lastFocused.focus === 'function') {
+    lastFocused.focus({ preventScroll: true });
+  }
+  lastFocused = null;
+
+  // 유저 조작으로 닫힌 경우: push했던 히스토리 항목 정리 (popstate 경로면 이미 false)
+  if (modalHistoryPushed) {
+    modalHistoryPushed = false;
+    history.back();
+  }
 }
 
+// ── 스크롤 잠금/복원 (position:fixed 기법) ──
+let savedScrollY = 0;
+function lockBodyScroll() {
+  savedScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.position = 'fixed';
+  document.body.style.top      = `-${savedScrollY}px`;
+  document.body.style.left     = '0';
+  document.body.style.right    = '0';
+  document.body.style.width    = '100%';
+}
+function unlockBodyScroll() {
+  document.body.style.position = '';
+  document.body.style.top      = '';
+  document.body.style.left     = '';
+  document.body.style.right    = '';
+  document.body.style.width    = '';
+  window.scrollTo(0, savedScrollY);
+}
+
+// ── 상태 ──
+let lastFocused = null;
+let modalHistoryPushed = false;
+const mqMobile = window.matchMedia('(max-width: 768px)');
+
+// 뒤로가기로 닫을 때 브라우저 기본 스크롤 복원이 우리 복원을 덮어쓰지 않도록
+// (index 문서에만 적용 — 다른 페이지는 main.js를 로드하지 않음)
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+// ── 닫기: X 버튼 ──
 modalClose.addEventListener('click', closeModal);
-postModal.addEventListener('click', e => { if (e.target === postModal) closeModal(); });
+
+// ── 닫기: ESC ──
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── 닫기: 뒤로가기 (모바일) ──
+window.addEventListener('popstate', () => {
+  if (postModal.classList.contains('open')) {
+    modalHistoryPushed = false; // 항목은 이미 pop됨 → closeModal이 back 재호출 안 하도록
+    closeModal();
+  }
+});
+
+// ── 닫기: 데스크탑 배경(본문 밖 여백) 클릭 ──
+// mousedown·mouseup 둘 다 여백에서 발생하고 드래그가 아닐 때만 닫음 → 텍스트 선택 보호
+function isDismissTarget(t) {
+  return !!t && !t.closest('.modal-body') && !t.closest('.modal-images') && !t.closest('.modal-close');
+}
+let downOnDismiss = false, downX = 0, downY = 0;
+postModal.addEventListener('mousedown', e => {
+  downOnDismiss = e.button === 0 && isDismissTarget(e.target);
+  downX = e.clientX; downY = e.clientY;
+});
+postModal.addEventListener('mouseup', e => {
+  if (downOnDismiss && isDismissTarget(e.target)) {
+    const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
+    if (moved < 10) closeModal();
+  }
+  downOnDismiss = false;
+});
+
+// ── 닫기: 아래로 스와이프 (모바일) ──
+// 모달 스크롤이 맨 위(scrollTop===0)일 때만 무장. 100px 이상 당기면 닫힘.
+const SWIPE_CLOSE_PX = 100;
+let swArmed = false, swDragging = false, swStartY = 0, swDy = 0;
+
+postModal.addEventListener('touchstart', e => {
+  if (!mqMobile.matches || e.touches.length !== 1) { swArmed = false; return; }
+  swArmed = postModal.scrollTop <= 0;
+  swStartY = e.touches[0].clientY;
+  swDy = 0;
+  swDragging = false;
+  modalInner.classList.remove('snap');
+  postModal.classList.remove('snap');
+}, { passive: true });
+
+postModal.addEventListener('touchmove', e => {
+  if (!mqMobile.matches || !swArmed) return;
+  const dy = e.touches[0].clientY - swStartY;
+  if (dy <= 0) { // 위로 올리면 드래그 해제 → 네이티브 스크롤에 양보
+    if (swDragging) { swDragging = false; modalInner.style.transform = ''; postModal.style.background = ''; }
+    return;
+  }
+  swDragging = true;
+  swDy = dy;
+  e.preventDefault(); // rubber-band/스크롤 억제
+  modalInner.style.transform = `translateY(${dy}px)`;
+  const ratio = Math.min(dy / (window.innerHeight * 0.6), 1);
+  postModal.style.background = `rgba(10,10,9,${(0.96 * (1 - ratio * 0.85)).toFixed(3)})`;
+}, { passive: false });
+
+postModal.addEventListener('touchend', () => {
+  if (!mqMobile.matches || !swDragging) { swArmed = false; swDragging = false; return; }
+  swDragging = false; swArmed = false;
+
+  modalInner.classList.add('snap');
+  postModal.classList.add('snap');
+
+  if (swDy > SWIPE_CLOSE_PX) {
+    // 임계값 초과 → 아래로 밀어내고 닫기
+    modalInner.style.transform = `translateY(${window.innerHeight}px)`;
+    postModal.style.background  = 'rgba(10,10,9,0)';
+    let done = false;
+    const finish = () => { if (done) return; done = true; modalInner.removeEventListener('transitionend', finish); closeModal(); };
+    modalInner.addEventListener('transitionend', finish);
+    setTimeout(finish, 400); // 트랜지션 미발생(감속모션) 대비
+  } else {
+    // 임계값 미달 → 원위치 복귀
+    modalInner.style.transform = 'translateY(0)';
+    postModal.style.background  = 'rgba(10,10,9,0.96)';
+  }
+}, { passive: true });
 
 function showWriteBox() {
   loginBox.style.display = 'none';

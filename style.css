@@ -703,6 +703,10 @@ a { color: inherit; text-decoration: none; }
   animation: modalIn 0.4s ease;
 }
 
+/* swipe-to-close (mobile): snap-back / dismiss transition toggled from JS */
+.modal-inner.snap { transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1); }
+.post-modal.snap  { transition: background-color 0.32s ease; }
+
 @keyframes modalIn {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -711,6 +715,7 @@ a { color: inherit; text-decoration: none; }
 .modal-left {
   padding: 4rem 3rem 4rem 3.5rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -719,6 +724,7 @@ a { color: inherit; text-decoration: none; }
 .modal-right {
   padding: 4rem 3rem 4rem 3rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .modal-close {
@@ -855,7 +861,11 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 768px) {
-  .post-modal { overflow-y: auto; }
+  .post-modal {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 
   .modal-inner {
     grid-template-columns: 1fr;
@@ -873,6 +883,13 @@ a { color: inherit; text-decoration: none; }
   .modal-right {
     padding: 2rem 1.6rem 5rem;
   }
+}
+
+/* 모션 최소화 선호 시 애니메이션 억제 */
+@media (prefers-reduced-motion: reduce) {
+  .modal-inner { animation: none; }
+  .modal-inner.snap,
+  .post-modal.snap { transition: none; }
 }
 
 @media (min-width: 769px) {
