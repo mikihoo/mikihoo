@@ -496,8 +496,9 @@ function openModal(post) {
   postModal.scrollTop = 0;
 
   // 포커스 이동 (닫을 때 복귀용으로 현재 포커스 저장)
+  // X 버튼이 아닌 다이얼로그 컨테이너로 옮겨 포커스 링이 X에 남지 않게 함
   lastFocused = document.activeElement;
-  if (modalClose) modalClose.focus({ preventScroll: true });
+  postModal.focus({ preventScroll: true });
 
   // 모바일: 뒤로가기로 닫을 수 있게 히스토리 push
   if (mqMobile.matches) {
@@ -591,14 +592,15 @@ postModal.addEventListener('mouseup', e => {
   downOnDismiss = false;
 });
 
-// ── 닫기: 아래로 스와이프 (모바일) ──
-// 모달 스크롤이 맨 위(scrollTop===0)일 때만 무장. 100px 이상 당기면 닫힘.
+// ── 닫기: 스와이프 (모바일) ──
+// 맨 위에서 아래로 당기거나, 맨 아래에서 위로 밀면 닫힘. 100px 이상이면 닫기.
 const SWIPE_CLOSE_PX = 100;
-let swArmed = false, swDragging = false, swStartY = 0, swDy = 0;
+let swAtTop = false, swAtBottom = false, swDragging = false, swStartY = 0, swDy = 0;
 
 postModal.addEventListener('touchstart', e => {
-  if (!mqMobile.matches || e.touches.length !== 1) { swArmed = false; return; }
-  swArmed = postModal.scrollTop <= 0;
+  if (!mqMobile.matches || e.touches.length !== 1) { swDragging = false; swAtTop = swAtBottom = false; return; }
+  swAtTop    = postModal.scrollTop <= 0;
+  swAtBottom = postModal.scrollTop + postModal.clientHeight >= postModal.scrollHeight - 1;
   swStartY = e.touches[0].clientY;
   swDy = 0;
   swDragging = false;
@@ -607,9 +609,11 @@ postModal.addEventListener('touchstart', e => {
 }, { passive: true });
 
 postModal.addEventListener('touchmove', e => {
-  if (!mqMobile.matches || !swArmed) return;
+  if (!mqMobile.matches) return;
   const dy = e.touches[0].clientY - swStartY;
-  if (dy <= 0) { // 위로 올리면 드래그 해제 → 네이티브 스크롤에 양보
+  const canDown = dy > 0 && swAtTop;    // 맨 위에서 아래로
+  const canUp   = dy < 0 && swAtBottom; // 맨 아래에서 위로
+  if (!canDown && !canUp) { // 해당 방향으로 스크롤 여지가 있으면 네이티브에 양보
     if (swDragging) { swDragging = false; modalInner.style.transform = ''; postModal.style.background = ''; }
     return;
   }
@@ -617,20 +621,21 @@ postModal.addEventListener('touchmove', e => {
   swDy = dy;
   e.preventDefault(); // rubber-band/스크롤 억제
   modalInner.style.transform = `translateY(${dy}px)`;
-  const ratio = Math.min(dy / (window.innerHeight * 0.6), 1);
+  const ratio = Math.min(Math.abs(dy) / (window.innerHeight * 0.6), 1);
   postModal.style.background = `rgba(10,10,9,${(0.96 * (1 - ratio * 0.85)).toFixed(3)})`;
 }, { passive: false });
 
 postModal.addEventListener('touchend', () => {
-  if (!mqMobile.matches || !swDragging) { swArmed = false; swDragging = false; return; }
-  swDragging = false; swArmed = false;
+  if (!mqMobile.matches || !swDragging) { swDragging = false; return; }
+  swDragging = false;
 
   modalInner.classList.add('snap');
   postModal.classList.add('snap');
 
-  if (swDy > SWIPE_CLOSE_PX) {
-    // 임계값 초과 → 아래로 밀어내고 닫기
-    modalInner.style.transform = `translateY(${window.innerHeight}px)`;
+  if (Math.abs(swDy) > SWIPE_CLOSE_PX) {
+    // 임계값 초과 → 당긴 방향으로 밀어내고 닫기
+    const dir = swDy > 0 ? 1 : -1;
+    modalInner.style.transform = `translateY(${dir * window.innerHeight}px)`;
     postModal.style.background  = 'rgba(10,10,9,0)';
     let done = false;
     const finish = () => { if (done) return; done = true; modalInner.removeEventListener('transitionend', finish); closeModal(); };

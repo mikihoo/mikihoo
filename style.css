@@ -696,6 +696,10 @@ a { color: inherit; text-decoration: none; }
 
 .post-modal.open { display: block; }
 
+/* 열릴 때 컨테이너로 포커스를 옮기지만 링은 숨김 (X 버튼 등 실제 컨트롤의 키보드 포커스 링은 유지) */
+.post-modal:focus,
+.post-modal:focus-visible { outline: none; }
+
 .modal-inner {
   display: grid;
   grid-template-columns: 1fr 1fr;
