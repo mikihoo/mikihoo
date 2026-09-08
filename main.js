@@ -468,8 +468,10 @@ async function swapOrder(a, b) {
 }
 
 // ── Modal ──
-function openModal(post) {
-  // 이미지 목록: image_urls 배열 우선, 없으면 image_url 단일
+let currentPostIndex = -1;
+
+// 내용만 채움 (열기/닫기·히스토리·스크롤잠금과 분리 — 다음 글 이동에서 재사용)
+function fillModal(post) {
   const imgs = (post.image_urls && post.image_urls.length)
     ? post.image_urls
     : (post.image_url ? [post.image_url] : []);
@@ -483,13 +485,20 @@ function openModal(post) {
   modalExcerpt.textContent = post.excerpt || '';
   if (modalWeather) modalWeather.textContent = post.weather_text || '';
 
+  currentPostIndex = posts.findIndex(p => p.id === post.id);
+}
+
+function openModal(post) {
+  fillModal(post);
+
   // 배경 페이지 스크롤 잠금 (위치 저장)
   lockBodyScroll();
 
-  // 열기 전 상태 초기화 (스와이프 잔여 transform 제거)
-  modalInner.classList.remove('snap');
+  // 열기 전 상태 초기화 (스와이프/페이드 잔여 상태 제거)
+  modalInner.classList.remove('snap', 'fading');
   postModal.classList.remove('snap');
   modalInner.style.transform = '';
+  modalInner.style.opacity    = '';
   postModal.style.background  = '';
 
   postModal.classList.add('open');
@@ -505,6 +514,56 @@ function openModal(post) {
     history.pushState({ mikihooModal: true }, '');
     modalHistoryPushed = true;
   }
+}
+
+// 다음 글로 이동 (마지막이면 닫기). 히스토리는 추가하지 않음 → 뒤로가기 한 번에 목록 복귀.
+let advancing = false;
+const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+function advanceNext() {
+  if (advancing) return;
+  const nextIdx = currentPostIndex + 1;
+  if (nextIdx >= posts.length) { closeModal(); return; } // 마지막 글 → 닫기
+  advancing = true;
+
+  // 드래그 잔여 상태 정리
+  modalInner.classList.remove('snap');
+  postModal.classList.remove('snap');
+  modalInner.style.transform = '';
+  postModal.style.background  = '';
+
+  const commit = () => {
+    fillModal(posts[nextIdx]);
+    postModal.scrollTop = 0;
+    const l = postModal.querySelector('.modal-left');
+    const r = postModal.querySelector('.modal-right');
+    if (l) l.scrollTop = 0;
+    if (r) r.scrollTop = 0;
+  };
+
+  if (prefersReduce.matches) { // 모션 최소화 → 즉시 교체
+    commit();
+    modalInner.style.opacity = '';
+    advancing = false;
+    return;
+  }
+
+  modalInner.classList.add('fading');
+  modalInner.style.opacity = '0';
+  let done = false;
+  const afterOut = () => {
+    if (done) return;
+    done = true;
+    modalInner.removeEventListener('transitionend', afterOut);
+    commit();
+    requestAnimationFrame(() => { modalInner.style.opacity = '1'; });
+    setTimeout(() => {
+      modalInner.classList.remove('fading');
+      modalInner.style.opacity = '';
+      advancing = false;
+    }, 220);
+  };
+  modalInner.addEventListener('transitionend', afterOut);
+  setTimeout(afterOut, 240); // fallback
 }
 
 function closeModal() {
@@ -629,22 +688,49 @@ postModal.addEventListener('touchend', () => {
   if (!mqMobile.matches || !swDragging) { swDragging = false; return; }
   swDragging = false;
 
-  modalInner.classList.add('snap');
-  postModal.classList.add('snap');
-
   if (Math.abs(swDy) > SWIPE_CLOSE_PX) {
-    // 임계값 초과 → 당긴 방향으로 밀어내고 닫기
-    const dir = swDy > 0 ? 1 : -1;
-    modalInner.style.transform = `translateY(${dir * window.innerHeight}px)`;
-    postModal.style.background  = 'rgba(10,10,9,0)';
-    let done = false;
-    const finish = () => { if (done) return; done = true; modalInner.removeEventListener('transitionend', finish); closeModal(); };
-    modalInner.addEventListener('transitionend', finish);
-    setTimeout(finish, 400); // 트랜지션 미발생(감속모션) 대비
+    if (swDy > 0) {
+      slideOutAndClose(1);                         // 맨 위에서 아래로 → 닫기
+    } else if (currentPostIndex + 1 < posts.length) {
+      advanceNext();                               // 맨 아래에서 위로 → 다음 글
+    } else {
+      slideOutAndClose(-1);                        // 마지막 글에서 위로 → 닫기
+    }
   } else {
     // 임계값 미달 → 원위치 복귀
+    modalInner.classList.add('snap');
+    postModal.classList.add('snap');
     modalInner.style.transform = 'translateY(0)';
     postModal.style.background  = 'rgba(10,10,9,0.96)';
+  }
+}, { passive: true });
+
+// 당긴 방향으로 밀어내며 닫기 (아래로 스와이프, 마지막 글 위로 스와이프)
+function slideOutAndClose(dir) {
+  modalInner.classList.add('snap');
+  postModal.classList.add('snap');
+  modalInner.style.transform = `translateY(${dir * window.innerHeight}px)`;
+  postModal.style.background  = 'rgba(10,10,9,0)';
+  let done = false;
+  const finish = () => { if (done) return; done = true; modalInner.removeEventListener('transitionend', finish); closeModal(); };
+  modalInner.addEventListener('transitionend', finish);
+  setTimeout(finish, 400); // 트랜지션 미발생(감속모션) 대비
+}
+
+// ── 다음 글: 데스크탑 — 맨 아래에서 계속 아래로 스크롤(overscroll) ──
+let wheelAccum = 0, wheelTimer = null;
+postModal.addEventListener('wheel', e => {
+  if (mqMobile.matches || !postModal.classList.contains('open')) return;
+  const scroller = e.target.closest ? e.target.closest('.modal-left, .modal-right') : null;
+  if (!scroller) { wheelAccum = 0; return; }
+  const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+  if (e.deltaY > 0 && atBottom) {
+    wheelAccum += e.deltaY;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => { wheelAccum = 0; }, 220); // 잠깐 멈추면 리셋
+    if (wheelAccum > 160) { wheelAccum = 0; advanceNext(); }
+  } else {
+    wheelAccum = 0;
   }
 }, { passive: true });
 
