@@ -147,7 +147,7 @@
         flex-direction: row;
         align-items: center;
         width: auto;
-        max-width: 840px;
+        max-width: 880px;
         max-height: 86vh;
       }
       .artist-modal-photo {
@@ -158,8 +158,9 @@
         align-self: center;
       }
       .artist-modal-body {
-        flex: 1 1 320px;
-        max-width: 360px;
+        flex: 1 1 360px;
+        max-width: 400px;
+        padding: 2rem 2.6rem;
       }
     }
 
@@ -176,14 +177,16 @@
       font-size: 0.88rem;
       color: var(--text-dim);
       line-height: 1.8;
-      margin-bottom: 1.4rem;
+      margin-bottom: 1.6rem;
       white-space: pre-line;
+      word-break: keep-all;      /* 한글을 단어 단위로만 줄바꿈 */
+      text-wrap: pretty;         /* 끝줄 외톨이 단어 방지 */
     }
 
     .artist-modal-links {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem 1.2rem;
+      flex-direction: column;
+      gap: 0.6rem;
     }
 
     .artist-modal-link {
@@ -253,7 +256,7 @@
         name: "suheeson",
         photo: "artist profile_1.avif",
         modalPhoto: "artist profile_1_B.avif",
-        bio: "소리와 장면을 기록합니다.",
+        bio: "사연 없는 사람",
         links: [
           { label: "Instagram",  url: "https://www.instagram.com/suheeson_" },
           { label: "YouTube",    url: "https://www.youtube.com/@Suheeson" },
