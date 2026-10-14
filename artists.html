@@ -151,10 +151,11 @@
         max-height: 86vh;
       }
       .artist-modal-photo {
-        height: 86vh;
+        /* 고유 비율 유지(무크롭·무바)하되 높이 변동폭을 묶어 모달 크기를 안정화 */
+        height: clamp(440px, 72vh, 620px);
         width: auto;
         max-width: 48vw;
-        max-height: none;
+        max-height: 86vh;
         align-self: center;
       }
       .artist-modal-body {
