@@ -2,3 +2,11 @@ cleanup.html
 .env
 .env.local
 .DS_Store
+
+# 원본 프로필 사진(대용량) — 레포엔 변환된 .avif만 둔다
+artist profile_*.jpg
+artist profile_*.jpeg
+artist profile_*.JPG
+artist profile_*.png
+former profile/
+hero vid project/
