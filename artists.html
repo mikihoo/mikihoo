@@ -129,16 +129,38 @@
     }
 
     .artist-modal-photo {
-      width: 100%;
-      aspect-ratio: 2 / 3;
-      object-fit: cover;
-      object-position: center;
+      width: auto;
+      max-width: 100%;
+      max-height: 50vh;
+      margin: 0 auto;
       display: block;
       flex-shrink: 0;
     }
 
     .artist-modal-body {
       padding: 2rem 2.2rem 2.4rem;
+    }
+
+    /* 데스크탑: 사진 + 텍스트를 좌우로 → 사진 전체 노출 + 한 화면에 수납 */
+    @media (min-width: 769px) {
+      .artist-modal-inner {
+        flex-direction: row;
+        align-items: center;
+        width: auto;
+        max-width: 840px;
+        max-height: 86vh;
+      }
+      .artist-modal-photo {
+        height: 86vh;
+        width: auto;
+        max-width: 48vw;
+        max-height: none;
+        align-self: center;
+      }
+      .artist-modal-body {
+        flex: 1 1 320px;
+        max-width: 360px;
+      }
     }
 
     .artist-modal-name {
@@ -230,6 +252,7 @@
       {
         name: "suheeson",
         photo: "artist profile_1.avif",
+        modalPhoto: "artist profile_1_B.avif",
         bio: "소리와 장면을 기록합니다.",
         links: [
           { label: "Instagram",  url: "https://www.instagram.com/suheeson_" },
@@ -240,6 +263,7 @@
       {
         name: "eeajik",
         photo: "artist profile_2.avif",
+        modalPhoto: "artist profile_2_B.avif",
         bio: "단지 좋아하는 재질의 소리들을 모아 다분히 개인적인 글을 여러 목소리로 엮는다.",
         links: [
           { label: "Instagram",  url: "https://www.instagram.com/ooswu" },
@@ -250,6 +274,7 @@
       {
         name: "donizanai",
         photo: "artist profile_3.avif",
+        modalPhoto: "artist profile_3_B.avif",
         bio: "룸펜 프롤레타리아 오버드라이브!",
         links: [
           { label: "Instagram", url: "https://www.instagram.com/gerda_dongwoo" },
@@ -258,6 +283,7 @@
       {
         name: "saeglopur",
         photo: "artist profile_4.avif",
+        modalPhoto: "artist profile_4_B.avif",
         bio: "바다 바보",
         links: [
           { label: "Instagram",  url: "https://www.instagram.com/saeglopur__/" },
@@ -333,8 +359,9 @@
     const modalClose  = document.getElementById('artistModalClose');
 
     function openArtistModal(artist) {
-      if (artist.photo) {
-        modalPhoto.src = artist.photo;
+      const mPhoto = artist.modalPhoto || artist.photo;
+      if (mPhoto) {
+        modalPhoto.src = mPhoto;
         modalPhoto.style.display = 'block';
       } else {
         modalPhoto.style.display = 'none';
