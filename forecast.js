@@ -34,7 +34,7 @@
   // ── 타임표 렌더 ──
   var tt = document.getElementById('fcTimetable');
   if (tt) {
-    var html = '<div class="fc-entry">' + esc(FC.entry.time) + '  ' + esc(FC.entry.label) + '</div>';
+    var html = '';
     FC.lineup.forEach(function (p) {
       html += '<div class="track-item fc-slot" data-name="' + esc(p.name) + '">' +
                 '<span class="track-icon">' + weatherIconSvg(p.icon) + '</span>' +
