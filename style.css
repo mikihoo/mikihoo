@@ -910,9 +910,10 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 768px) {
   .site-header { padding: 0 1.2rem; }
 
-  /* keep logo + nav on one line on narrow phones */
-  .site-nav { gap: clamp(0.7rem, 3.5vw, 2.4rem); }
-  .site-nav a { white-space: nowrap; }
+  /* keep logo + nav(5 tabs) on one line on narrow phones */
+  .site-title { font-size: 1rem; }
+  .site-nav { gap: clamp(0.42rem, 2.4vw, 2.4rem); }
+  .site-nav a { white-space: nowrap; font-size: 0.6rem; }
 
   .footer-admin { display: none; }
 
@@ -1248,4 +1249,147 @@ a { color: inherit; text-decoration: none; }
   .player-controls { grid-area: controls; }
   .player-seek { grid-area: seek; }
   .player-time { grid-area: time; }
+}
+
+/* ── 예보 (forecast) ───────────────────────────────────────────── */
+.wb-forecast {
+  color: var(--text-dim);
+  text-decoration: none;
+  margin-left: 0.6em;
+  transition: color 0.5s ease;
+}
+.wb-forecast:hover { color: var(--accent); }
+
+.forecast-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+}
+
+.forecast-left {
+  border-right: 1px solid var(--border);
+  padding: 3rem 2.8rem;
+}
+.forecast-stack { position: sticky; top: 76px; }
+.forecast-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #0f0f0f;
+  overflow: hidden;
+}
+.fc-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.fc-img.show { opacity: 1; }
+
+.forecast-right {
+  padding: 3rem 2.8rem;
+  max-width: 560px;
+}
+
+.forecast-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  margin-bottom: 0.8rem;
+  font-family: 'EB Garamond', serif;
+}
+.forecast-title {
+  font-family: 'EB Garamond', 'Noto Serif KR', serif;
+  font-size: 1.7rem;
+  font-weight: 400;
+  color: var(--text-title);
+  letter-spacing: 0.01em;
+  margin-bottom: 0.7rem;
+}
+.forecast-meta {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  margin-bottom: 2.4rem;
+}
+
+.forecast-quote {
+  margin: 0 0 2.4rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+  font-family: 'EB Garamond', 'Noto Serif KR', serif;
+  font-style: italic;
+  font-size: 0.82rem;
+  line-height: 1.95;
+  color: var(--text-dim);
+  word-break: keep-all;
+}
+.forecast-quote cite {
+  display: block;
+  margin-top: 0.7rem;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+.forecast-body { margin-bottom: 2.8rem; }
+.forecast-body p {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 2.1;
+  word-break: keep-all;
+  margin-bottom: 1.3rem;
+}
+.forecast-body p:last-child { margin-bottom: 0; }
+
+.forecast-section { margin-bottom: 2.8rem; }
+.fc-timetable { margin-top: 0.2rem; }
+
+.fc-entry {
+  padding: 1.15rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.fc-slot .track-artist { font-style: italic; }
+
+.fc-info p {
+  font-size: 0.72rem;
+  line-height: 1.95;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  margin: 0.35rem 0;
+}
+.forecast-book {
+  display: inline-block;
+  margin-top: 1.4rem;
+  text-decoration: none;
+}
+
+/* 채집자 카드 공연시간 */
+.artist-showtime {
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  font-style: italic;
+  color: rgba(200, 196, 188, 0.6);
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .forecast-main { grid-template-columns: 1fr; }
+  .forecast-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1.6rem 1.4rem;
+  }
+  .forecast-stack { position: static; top: auto; }
+  .forecast-right { padding: 2rem 1.4rem 3rem; max-width: none; }
 }

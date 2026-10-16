@@ -10,3 +10,6 @@ artist profile_*.JPG
 artist profile_*.png
 former profile/
 hero vid project/
+
+# 예보 포스터 원본(대용량) — 변환된 .avif만 커밋
+예보탭_이미지자료/

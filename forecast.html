@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예보 — mikihoo</title>
+  <meta name="description" content="microclimate — 2026.11.14 무대륙" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="forecast-config.js"></script>
+</head>
+<body>
+
+  <header class="site-header">
+    <a href="index.html" class="site-title">mikihoo / 微氣候</a>
+    <nav class="site-nav">
+      <a href="index.html">수기록</a>
+      <a href="weather.html">당신의 날씨</a>
+      <a href="sound.html">채음</a>
+      <a href="artists.html">채집자</a>
+    </nav>
+  </header>
+
+  <main class="forecast-main">
+
+    <!-- 왼쪽: 이미지 (데스크톱 sticky, 호버 시 출연자로 크로스페이드) -->
+    <div class="forecast-left">
+      <div class="forecast-stack">
+        <div class="forecast-frame" id="fcFrame">
+          <img class="fc-img show" id="fcPoster" src="forecast-poster.avif" alt="microclimate 포스터" />
+          <img class="fc-img" data-name="saeglopur" src="forecast-saeglopur.avif" alt="saeglopur" />
+          <img class="fc-img" data-name="suheeson"  src="forecast-suheeson.avif"  alt="suheeson" />
+          <img class="fc-img" data-name="donizanai" src="forecast-donizanai.avif" alt="donizanai" />
+          <img class="fc-img" data-name="eeajik"    src="forecast-eeajik.avif"    alt="eeajik" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 텍스트 -->
+    <div class="forecast-right">
+      <div class="forecast-label">예보 / 豫報</div>
+      <h1 class="forecast-title">microclimate</h1>
+      <div class="forecast-meta">2026.11.14 (토) 18:00 · 무대륙</div>
+
+      <blockquote class="forecast-quote">
+        쓰고, 쓰고, 또 쓰게 하라. 기록하고 보존하게 하라. 노아의 방주처럼 되게 하라. 크든 작든, 정결하든 부정하든 모든 생물이 있어야 하나니, 모든 종류와 모든 이야기에서 하나씩 데려오라.
+        <cite>게오르기 고스포디노프, 『슬픔의 물리학』</cite>
+      </blockquote>
+
+      <div class="forecast-body">
+        <p>이곳에 이름을 올린 넷은 이것을 하고 싶지도, 하기 싫지도 않다. 훌륭하고 아름다운 것을 만들겠다는 욕심도 안 들고, 딱히 남들 앞에 나서고 싶지도 않다. 뭐든 해야 할 것 같은 위기감도 없고, 앞으로의 계획이 있는 것도 아니다. 음악을 만드는 건 재미있지만, 술을 마시거나 누워 있는 것만큼 즐겁지는 않은 것 같다.</p>
+        <p>땡볕에 서 있으면 화가 나고 바람이 차면 몸이 떨리고 비가 내리면 우산을 쓰듯이, 어떤 사람들은 삶이 무료해지면 일을 벌인다. 어떤 식으로든 기록을 해 두면 나중에는 어디에든 쓸 곳이 생길 것이고, 쓸데가 없다고 문제가 되지도 않는다. 어떤 것을 느끼거나 겪었다고 해서, 그것을 굳이 남들 앞에서 말할 필요는 없다. 그 반대도 마찬가지다.</p>
+        <p>이 프로젝트의 이름은 미기후(微氣候)다. 어제의 날씨도 잊어버리는 사람들이 어찌저찌 잊지 않고 남겨둔 낙서와 습작과 메모와 초고들을 쓸 만한 것과 못 쓸 것을 가리지 않고 엮었다. 미기후는 방 하나, 골목 하나 정도의 날씨를 뜻하는 말이다.</p>
+      </div>
+
+      <section class="forecast-section">
+        <div class="entries-label">시간대별 예보</div>
+        <div class="fc-timetable" id="fcTimetable"></div>
+      </section>
+
+      <section class="forecast-section">
+        <div class="entries-label">관측 안내</div>
+        <div class="fc-info">
+          <p>서울 마포구 토정로5길 12, 무대륙</p>
+          <p>스탠딩 및 일부 좌석으로 진행</p>
+          <p>주류 및 음료 섭취 가능 (1F에서 구매 가능)</p>
+          <p>500ml 이하 음료 외 식음료 반입 불가</p>
+          <p>입금 후 폼 작성 · 입금 확인 후 예매 확정 메일 발송</p>
+        </div>
+      </section>
+
+      <a class="btn-submit forecast-book" href="https://forms.gle/h5VyYCmng4u1uvPZ9" target="_blank" rel="noopener noreferrer">예매하기</a>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <span>mikihoo &copy; 2026</span>
+  </footer>
+
+  <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
+  <script src="lenis-init.js"></script>
+  <script src="forecast.js"></script>
+  <script src="grain.js"></script>
+  <script src="header-particles.js"></script>
+</body>
+</html>

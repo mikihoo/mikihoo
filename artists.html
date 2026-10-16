@@ -7,6 +7,7 @@
   <meta name="description" content="mikihoo와 함께하는 채집자들." />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="style.css" />
+  <script src="forecast-config.js"></script>
   <style>
     /* 푸터 바닥 고정 */
     body { min-height: 100vh; display: flex; flex-direction: column; }
@@ -333,6 +334,15 @@
       name.className = 'artist-name';
       name.textContent = artist.name;
       info.appendChild(name);
+
+      // 공연 공지 — 공연 다음 날부터 자동으로 숨김 (forecast-config 에서 관리)
+      const showtime = window.FORECAST && window.FORECAST.showtimeFor(artist.name);
+      if (showtime) {
+        const st = document.createElement('div');
+        st.className = 'artist-showtime';
+        st.textContent = showtime;
+        info.appendChild(st);
+      }
 
       const linksEl = document.createElement('div');
       linksEl.className = 'artist-links';
