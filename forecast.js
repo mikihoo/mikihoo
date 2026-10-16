@@ -72,16 +72,25 @@
       });
       tt.addEventListener('mouseleave', showPoster);
     } else {
-      var active = null;
-      rows.forEach(function (row) {
-        row.addEventListener('click', function (e) {
-          e.stopPropagation();
-          if (active === row.dataset.name) { showPoster(); active = null; }
-          else { showArtist(row.dataset.name); active = row.dataset.name; }
-        });
+      // 모바일: 이미지가 위, 타임표는 아래라 행 탭은 효과를 보기 어렵다.
+      // → 이미지를 탭하면 포스터 → 출연자들 → 포스터 순으로 순환.
+      var cycle = ['__poster__'].concat(FC.lineup.map(function (p) { return p.name; }));
+      var idx = 0;
+      function applyIdx() {
+        var n = cycle[idx];
+        if (n === '__poster__') showPoster(); else showArtist(n);
+      }
+      frame.style.cursor = 'pointer';
+      frame.addEventListener('click', function () {
+        idx = (idx + 1) % cycle.length;
+        applyIdx();
       });
-      document.addEventListener('click', function () {
-        if (active) { showPoster(); active = null; }
+      // 타임표 행 탭도 해당 출연자로 전환 (이미지 순환 위치도 동기화)
+      rows.forEach(function (row) {
+        row.addEventListener('click', function () {
+          var i = cycle.indexOf(row.dataset.name);
+          if (i >= 0) { idx = i; applyIdx(); }
+        });
       });
     }
   }
