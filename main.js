@@ -516,13 +516,14 @@ function openModal(post) {
   }
 }
 
-// 다음 글로 이동 (마지막이면 닫기). 히스토리는 추가하지 않음 → 뒤로가기 한 번에 목록 복귀.
+// 글 이동 (step +1 다음 / -1 이전). 경계를 넘으면 닫기.
+// 히스토리는 추가하지 않음 → 뒤로가기 한 번에 목록 복귀.
 let advancing = false;
 const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-function advanceNext() {
+function advance(step) {
   if (advancing) return;
-  const nextIdx = currentPostIndex + 1;
-  if (nextIdx >= posts.length) { closeModal(); return; } // 마지막 글 → 닫기
+  const targetIdx = currentPostIndex + step;
+  if (targetIdx < 0 || targetIdx >= posts.length) { closeModal(); return; } // 경계 → 닫기
   advancing = true;
 
   // 드래그 잔여 상태 정리
@@ -532,7 +533,7 @@ function advanceNext() {
   postModal.style.background  = '';
 
   const commit = () => {
-    fillModal(posts[nextIdx]);
+    fillModal(posts[targetIdx]);
     postModal.scrollTop = 0;
     const l = postModal.querySelector('.modal-left');
     const r = postModal.querySelector('.modal-right');
@@ -689,12 +690,12 @@ postModal.addEventListener('touchend', () => {
   swDragging = false;
 
   if (Math.abs(swDy) > SWIPE_CLOSE_PX) {
-    if (swDy > 0) {
-      slideOutAndClose(1);                         // 맨 위에서 아래로 → 닫기
-    } else if (currentPostIndex + 1 < posts.length) {
-      advanceNext();                               // 맨 아래에서 위로 → 다음 글
-    } else {
-      slideOutAndClose(-1);                        // 마지막 글에서 위로 → 닫기
+    if (swDy > 0) {                                // 맨 위에서 아래로
+      if (currentPostIndex > 0) advance(-1);       //   → 이전 글
+      else slideOutAndClose(1);                    //   첫 글 → 닫기
+    } else {                                       // 맨 아래에서 위로
+      if (currentPostIndex + 1 < posts.length) advance(1);  // → 다음 글
+      else slideOutAndClose(-1);                   //   마지막 글 → 닫기
     }
   } else {
     // 임계값 미달 → 원위치 복귀
@@ -717,18 +718,24 @@ function slideOutAndClose(dir) {
   setTimeout(finish, 400); // 트랜지션 미발생(감속모션) 대비
 }
 
-// ── 다음 글: 데스크탑 — 맨 아래에서 계속 아래로 스크롤(overscroll) ──
+// ── 데스크탑: 끝에서 계속 스크롤(overscroll) → 다음/이전 글 ──
 let wheelAccum = 0, wheelTimer = null;
 postModal.addEventListener('wheel', e => {
   if (mqMobile.matches || !postModal.classList.contains('open')) return;
   const scroller = e.target.closest ? e.target.closest('.modal-left, .modal-right') : null;
   if (!scroller) { wheelAccum = 0; return; }
   const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
-  if (e.deltaY > 0 && atBottom) {
-    wheelAccum += e.deltaY;
+  const atTop    = scroller.scrollTop <= 0;
+  if (e.deltaY > 0 && atBottom) {               // 맨 아래에서 아래로 → 다음 글
+    wheelAccum = wheelAccum > 0 ? wheelAccum + e.deltaY : e.deltaY;
     clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(() => { wheelAccum = 0; }, 220); // 잠깐 멈추면 리셋
-    if (wheelAccum > 160) { wheelAccum = 0; advanceNext(); }
+    wheelTimer = setTimeout(() => { wheelAccum = 0; }, 220);
+    if (wheelAccum > 160) { wheelAccum = 0; advance(1); }
+  } else if (e.deltaY < 0 && atTop) {           // 맨 위에서 위로 → 이전 글
+    wheelAccum = wheelAccum < 0 ? wheelAccum + e.deltaY : e.deltaY;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => { wheelAccum = 0; }, 220);
+    if (wheelAccum < -160) { wheelAccum = 0; advance(-1); }
   } else {
     wheelAccum = 0;
   }
