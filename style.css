@@ -1267,10 +1267,10 @@ a { color: inherit; text-decoration: none; }
 }
 
 .forecast-left {
-  border-right: 1px solid var(--border);
   padding: 3rem 2.8rem;
 }
-.forecast-stack { position: sticky; top: 76px; }
+/* 포스터는 본문과 함께 자연스럽게 스크롤 (아래 섹션에 자투리 띠가 남지 않도록) */
+.forecast-stack { position: relative; }
 .forecast-frame {
   position: relative;
   width: 100%;
@@ -1292,6 +1292,7 @@ a { color: inherit; text-decoration: none; }
 .forecast-right {
   padding: 3rem 2.8rem;
   max-width: 560px;
+  border-left: 1px solid var(--border);   /* 세로 구분선(전체 높이) */
 }
 
 .forecast-label {
@@ -1391,7 +1392,7 @@ a { color: inherit; text-decoration: none; }
     padding: 1.6rem 1.4rem;
   }
   .forecast-stack { position: static; top: auto; }
-  .forecast-right { padding: 2rem 1.4rem 3rem; max-width: none; }
+  .forecast-right { padding: 2rem 1.4rem 3rem; max-width: none; border-left: none; }
 }
 
 /* 상단 예매 버튼 (메타 아래) */
