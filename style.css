@@ -1426,13 +1426,12 @@ a { color: inherit; text-decoration: none; }
 
 .reel-card {
   flex: 0 0 auto;
-  width: calc((100% - 3rem) / 3.5);   /* 데스크톱 3.5장 → 오른쪽 끝 살짝 잘림 */
   scroll-snap-align: start;
   cursor: pointer;
 }
 .reel-frame {
   position: relative;
-  width: 100%;
+  height: clamp(320px, 46vh, 460px);   /* 높이 기준 → 화면 폭과 무관하게 일정 */
   aspect-ratio: 9 / 16;
   overflow: hidden;
   background: #0f0f0f;
@@ -1489,7 +1488,7 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 768px) {
   .reels { padding: 2rem 1.4rem 3rem; }
-  .reel-card { width: calc((100% - 1rem) / 1.5); }  /* 모바일 1.5장 */
+  .reel-frame { height: clamp(320px, 54vh, 400px); }  /* 모바일 ~1.5장 */
   .reel-overlay { padding: 0; }
   .reel-overlay-video { max-height: 100vh; }
 }
