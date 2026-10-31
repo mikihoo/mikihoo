@@ -77,12 +77,25 @@
 
   </main>
 
+  <!-- 관측 기록 (영상) — 전체 폭 -->
+  <section class="reels" aria-label="관측 기록">
+    <div class="forecast-label">관측 기록 / 觀測記錄</div>
+    <div class="reel-strip" id="reelStrip"></div>
+  </section>
+
   <footer class="site-footer">
     <span>mikihoo &copy; 2026</span>
   </footer>
 
+  <!-- 영상 오버레이 -->
+  <div class="reel-overlay" id="reelOverlay" role="dialog" aria-modal="true" aria-label="영상 재생">
+    <video class="reel-overlay-video" id="reelBig" playsinline controls preload="auto"></video>
+    <button class="reel-overlay-close" id="reelClose" type="button">닫기</button>
+  </div>
+
   <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
   <script src="lenis-init.js"></script>
+  <script src="reels.js"></script>
   <script src="forecast.js"></script>
   <script src="grain.js"></script>
   <script src="header-particles.js"></script>

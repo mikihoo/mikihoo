@@ -95,3 +95,101 @@
     }
   }
 })();
+
+/* ── 관측 기록 (영상) ─────────────────────────────────────────── */
+(function () {
+  var R = window.REELS;
+  var strip = document.getElementById('reelStrip');
+  if (!R || !strip) return;
+
+  var base = R.base;
+  var items = R.items.slice().sort(function (a, b) {
+    return R.sort === 'desc' ? b.order - a.order : a.order - b.order;
+  });
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var url1080 = function (n) { return base + 'reel-' + n + '-1080.mp4'; };
+  var url540  = function (n) { return base + 'reel-' + n + '-540.mp4'; };
+  var urlThmb = function (n) { return base + 'reel-' + n + '.avif'; };
+
+  // ── 카드 렌더 (등록된 개수만큼만) ──
+  items.forEach(function (it) {
+    var card = document.createElement('figure');
+    card.className = 'reel-card';
+
+    var frame = document.createElement('div');
+    frame.className = 'reel-frame';
+
+    var v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true;
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+    v.preload = 'none';
+    v.poster = urlThmb(it.name);
+    if (!reduce) {                 // 모션 최소화면 썸네일만, 자동재생 안 함
+      var s = document.createElement('source');
+      s.src = url540(it.name); s.type = 'video/mp4';
+      v.appendChild(s);
+    }
+    frame.appendChild(v);
+
+    var cap = document.createElement('figcaption');
+    cap.className = 'reel-cap';
+    cap.textContent = it.caption;
+
+    card.appendChild(frame);
+    card.appendChild(cap);
+    card.addEventListener('click', function () { openOverlay(it); });
+    strip.appendChild(card);
+  });
+
+  var vids = strip.querySelectorAll('video');
+  var overlayOpen = false;
+
+  // ── 보이는 카드만 재생 ──
+  if (!reduce && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        var v = e.target;
+        if (e.isIntersecting && e.intersectionRatio > 0.5) {
+          if (!overlayOpen) { if (v.preload === 'none') v.preload = 'auto'; v.play().catch(function () {}); }
+        } else {
+          v.pause();
+        }
+      });
+    }, { threshold: [0, 0.5, 1] });
+    vids.forEach(function (v) { io.observe(v); });
+  }
+
+  // ── 오버레이 (1080, 소리 포함) ──
+  var overlay  = document.getElementById('reelOverlay');
+  var big      = document.getElementById('reelBig');
+  var closeBtn = document.getElementById('reelClose');
+  var savedOverflow = '';
+
+  function openOverlay(it) {
+    overlayOpen = true;
+    vids.forEach(function (v) { v.pause(); });     // 스트립 미리보기 일시정지
+    big.src = url1080(it.name);
+    big.muted = false;
+    overlay.classList.add('open');
+    savedOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    big.play().catch(function () {});
+  }
+  function closeOverlay() {
+    if (!overlay.classList.contains('open')) return;
+    overlay.classList.remove('open');
+    overlayOpen = false;
+    big.pause();
+    big.removeAttribute('src');
+    big.load();                                    // 메모리 해제
+    document.body.style.overflow = savedOverflow;
+    if (!reduce) vids.forEach(function (v) {        // 보이는 미리보기 재개
+      var r = v.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) v.play().catch(function () {});
+    });
+  }
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+  closeBtn.addEventListener('click', closeOverlay);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeOverlay(); });
+})();
