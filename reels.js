@@ -13,5 +13,6 @@ window.REELS = {
   items: [
     { name: 'teaser-1',             caption: 'microclimate — teaser 1', order: 1 },
     { name: 'suheeson-clear-water', caption: 'suheeson — Clear Water',  order: 2 },
+    { name: 'saeglopur-teaser-1', caption: 'saeglopur — teaser 1', order: 3 },
   ],
 };

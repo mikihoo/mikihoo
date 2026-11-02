@@ -165,16 +165,27 @@
   var big      = document.getElementById('reelBig');
   var closeBtn = document.getElementById('reelClose');
   var savedOverflow = '';
+  var curIndex = 0;
+  var coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+
+  if (coarse) big.removeAttribute('controls');     // 모바일은 제스처로 제어
+
+  function loadIndex(i) {
+    curIndex = (i + items.length) % items.length;  // 무한 루프
+    big.src = url1080(items[curIndex].name);
+    big.muted = false;
+    big.play().catch(function () {});
+  }
 
   function openOverlay(it) {
     overlayOpen = true;
     vids.forEach(function (v) { v.pause(); });     // 스트립 미리보기 일시정지
-    big.src = url1080(it.name);
-    big.muted = false;
     overlay.classList.add('open');
     savedOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    big.play().catch(function () {});
+    big.style.transition = ''; big.style.transform = ''; big.style.opacity = '';
+    overlay.style.background = '';
+    loadIndex(items.indexOf(it));
   }
   function closeOverlay() {
     if (!overlay.classList.contains('open')) return;
@@ -183,13 +194,74 @@
     big.pause();
     big.removeAttribute('src');
     big.load();                                    // 메모리 해제
+    big.style.transition = ''; big.style.transform = ''; big.style.opacity = '';
+    overlay.style.background = '';
     document.body.style.overflow = savedOverflow;
     if (!reduce) vids.forEach(function (v) {        // 보이는 미리보기 재개
       var r = v.getBoundingClientRect();
       if (r.top < window.innerHeight && r.bottom > 0) v.play().catch(function () {});
     });
   }
+  // 좌우 이동 (무한 루프) — 짧은 페이드로 교체
+  function nav(dir) {
+    big.style.transition = 'opacity 0.16s ease';
+    big.style.opacity = '0';
+    setTimeout(function () {
+      loadIndex(curIndex + dir);
+      big.style.transform = '';
+      requestAnimationFrame(function () { big.style.opacity = '1'; });
+      setTimeout(function () { big.style.transition = ''; big.style.opacity = ''; }, 180);
+    }, 150);
+  }
+
   overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
   closeBtn.addEventListener('click', closeOverlay);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeOverlay(); });
+
+  // ── 모바일 제스처: ↓닫기 / ←→이전·다음 / 탭=재생·일시정지 ──
+  if (coarse) {
+    var sx = 0, sy = 0, dx = 0, dy = 0, axis = null, dragging = false, moved = false, startT = null;
+    var VH = function () { return window.innerHeight; };
+
+    overlay.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) { dragging = false; return; }
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      dx = dy = 0; axis = null; dragging = true; moved = false; startT = e.target;
+      big.style.transition = 'none';
+    }, { passive: true });
+
+    overlay.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      dx = e.touches[0].clientX - sx; dy = e.touches[0].clientY - sy;
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+      if (!axis && moved) axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+      if (axis === 'y' && dy > 0) {                 // 아래로 → 닫기 피드백
+        e.preventDefault();
+        big.style.transform = 'translateY(' + dy + 'px)';
+        var t = Math.min(dy / (VH() * 0.5), 1);
+        overlay.style.background = 'rgba(10,10,9,' + (0.94 * (1 - t * 0.9)).toFixed(3) + ')';
+      } else if (axis === 'x') {                     // 좌우 → 이동 피드백(저항)
+        e.preventDefault();
+        big.style.transform = 'translateX(' + (dx * 0.35) + 'px)';
+      }
+    }, { passive: false });
+
+    overlay.addEventListener('touchend', function () {
+      if (!dragging) return;
+      dragging = false;
+      big.style.transition = 'transform 0.25s ease, opacity 0.2s ease';
+      if (axis === 'y' && dy > 100) {               // 닫기
+        closeOverlay();
+      } else if (axis === 'x' && Math.abs(dx) > 70) { // 좌=다음 / 우=이전
+        overlay.style.background = '';
+        nav(dx < 0 ? 1 : -1);
+      } else if (!moved && startT === big) {         // 탭 → 재생/일시정지
+        big.style.transform = '';
+        if (big.paused) big.play().catch(function () {}); else big.pause();
+      } else {                                        // 임계값 미달 → 원위치
+        big.style.transform = '';
+        overlay.style.background = '';
+      }
+    });
+  }
 })();
