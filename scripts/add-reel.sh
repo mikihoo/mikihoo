@@ -27,6 +27,7 @@ ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
 f1080="$OUT/reel-$NAME-1080.mp4"
 f540="$OUT/reel-$NAME-540.mp4"
+f720="$OUT/reel-$NAME-720.mp4"
 favif="$OUT/reel-$NAME.avif"
 
 echo "▸ 처리: $NAME"
@@ -43,6 +44,11 @@ else
     -pix_fmt yuv420p -profile:v high -c:a aac -b:a 192k -movflags +faststart "$f1080"
 fi
 
+# ── 720 오버레이용 (모바일 빠른 로딩, 소리 포함) ──
+ffmpeg -y -hide_banner -loglevel error -i "$IN" -vf scale=720:1280 \
+  -c:v libx264 -preset slow -b:v 3M -maxrate 4M -bufsize 6M \
+  -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "$f720"
+
 # ── 540 미리보기 (무음) ──
 ffmpeg -y -hide_banner -loglevel error -i "$IN" -vf scale=540:960 \
   -c:v libx264 -preset slow -b:v 1.5M -maxrate 2M -bufsize 3M \
@@ -54,7 +60,7 @@ ffmpeg -y -hide_banner -loglevel error -i "$IN" -frames:v 1 "$TMP"
 avifenc -q 90 --yuv 444 --depth 10 --speed 4 --jobs all "$TMP" "$favif" >/dev/null
 rm -f "$TMP"
 
-ls -lh "$f1080" "$f540" "$favif" | awk '{print "  "$5, $9}'
+ls -lh "$f1080" "$f720" "$f540" "$favif" | awk '{print "  "$5, $9}'
 
 # ── R2 업로드 (Standard) ──
 echo "▸ 업로드: s3://$BUCKET/$PREFIX/"
@@ -62,6 +68,7 @@ export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_A
 up() { aws s3 cp "$1" "s3://$BUCKET/$PREFIX/$(basename "$1")" \
         --endpoint-url "$ENDPOINT" --storage-class STANDARD --content-type "$2" --only-show-errors; }
 up "$f1080" "video/mp4"
+up "$f720"  "video/mp4"
 up "$f540"  "video/mp4"
 up "$favif" "image/avif"
 

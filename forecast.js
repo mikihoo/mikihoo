@@ -109,6 +109,7 @@
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var url1080 = function (n) { return base + 'reel-' + n + '-1080.mp4'; };
+  var url720  = function (n) { return base + 'reel-' + n + '-720.mp4'; };
   var url540  = function (n) { return base + 'reel-' + n + '-540.mp4'; };
   var urlThmb = function (n) { return base + 'reel-' + n + '.avif'; };
 
@@ -172,7 +173,9 @@
 
   function loadIndex(i) {
     curIndex = (i + items.length) % items.length;  // 무한 루프
-    big.src = url1080(items[curIndex].name);
+    var name = items[curIndex].name;
+    big.poster = urlThmb(name);                    // 로딩 중 썸네일 표시
+    big.src = (coarse ? url720 : url1080)(name);   // 모바일은 720p로 빠르게
     big.muted = false;
     big.play().catch(function () {});
   }
