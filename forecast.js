@@ -167,6 +167,7 @@
   var closeBtn = document.getElementById('reelClose');
   var savedOverflow = '';
   var curIndex = 0;
+  var prefetchName = '';
   var coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches;
 
   if (coarse) big.removeAttribute('controls');     // 모바일은 제스처로 제어
@@ -175,7 +176,7 @@
     curIndex = (i + items.length) % items.length;  // 무한 루프
     var name = items[curIndex].name;
     big.poster = urlThmb(name);                    // 로딩 중 썸네일 표시
-    big.src = (coarse ? url720 : url1080)(name);   // 모바일은 720p로 빠르게
+    big.src = url1080(name);                       // 1080 (모바일도 동일 화질)
     big.muted = false;
     big.play().catch(function () {});
   }
@@ -188,7 +189,14 @@
     document.body.style.overflow = 'hidden';
     big.style.transition = ''; big.style.transform = ''; big.style.opacity = '';
     overlay.style.background = '';
-    loadIndex(items.indexOf(it));
+    var i = items.indexOf(it);
+    if (coarse && prefetchName === it.name && big.getAttribute('src')) {
+      curIndex = i;                                // 이미 프리페치됨 → 버퍼에서 바로 재생
+      big.muted = false;
+      big.play().catch(function () {});
+    } else {
+      loadIndex(i);
+    }
   }
   function closeOverlay() {
     if (!overlay.classList.contains('open')) return;
@@ -200,11 +208,39 @@
     big.style.transition = ''; big.style.transform = ''; big.style.opacity = '';
     overlay.style.background = '';
     document.body.style.overflow = savedOverflow;
+    prefetchName = '';
     if (!reduce) vids.forEach(function (v) {        // 보이는 미리보기 재개
       var r = v.getBoundingClientRect();
       if (r.top < window.innerHeight && r.bottom > 0) v.play().catch(function () {});
     });
+    if (coarse) setTimeout(doPrefetch, 400);        // 다음 탭 대비 재프리페치
   }
+
+  // ── 모바일: 가운데 보이는 카드의 1080을 미리 버퍼링 → 탭하면 바로 재생 ──
+  function pfCentered() {
+    var sc = strip.getBoundingClientRect(), cx = sc.left + sc.width / 2, best = -1, bd = 1e9;
+    strip.querySelectorAll('.reel-card').forEach(function (c, i) {
+      var r = c.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - cx);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best >= 0 ? items[best] : null;
+  }
+  function doPrefetch() {
+    if (!coarse || overlayOpen) return;
+    var it = pfCentered();
+    if (!it || prefetchName === it.name) return;
+    prefetchName = it.name;
+    big.muted = true;
+    big.poster = urlThmb(it.name);
+    big.preload = 'auto';
+    big.src = url1080(it.name);                     // 재생은 안 함 — 버퍼링만
+  }
+  if (coarse) {
+    var pfT;
+    strip.addEventListener('scroll', function () { clearTimeout(pfT); pfT = setTimeout(doPrefetch, 300); }, { passive: true });
+    setTimeout(doPrefetch, 900);
+  }
+
   // 좌우 이동 (무한 루프) — 짧은 페이드로 교체
   function nav(dir) {
     big.style.transition = 'opacity 0.16s ease';
