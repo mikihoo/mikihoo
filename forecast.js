@@ -264,4 +264,30 @@
       }
     });
   }
+
+  // ── 데스크탑: 키보드 ←/→ 이전·다음(무한 루프), ↓ 닫기 / 트랙패드 좌우 스와이프 ──
+  if (!coarse) {
+    document.addEventListener('keydown', function (e) {
+      if (!overlay.classList.contains('open')) return;
+      if (e.key === 'ArrowRight')      { e.preventDefault(); nav(1); }
+      else if (e.key === 'ArrowLeft')  { e.preventDefault(); nav(-1); }
+      else if (e.key === 'ArrowDown')  { e.preventDefault(); closeOverlay(); }
+    });
+
+    var wAccum = 0, wLock = false, wTimer = null;
+    overlay.addEventListener('wheel', function (e) {
+      if (!overlay.classList.contains('open')) return;
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;   // 가로 스와이프만
+      e.preventDefault();
+      if (wLock) return;
+      wAccum += e.deltaX;
+      clearTimeout(wTimer); wTimer = setTimeout(function () { wAccum = 0; }, 200);
+      if (Math.abs(wAccum) > 90) {
+        wLock = true;
+        nav(wAccum > 0 ? 1 : -1);                 // 왼쪽으로 스와이프 → 다음
+        wAccum = 0;
+        setTimeout(function () { wLock = false; }, 420);
+      }
+    }, { passive: false });
+  }
 })();
