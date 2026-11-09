@@ -15,5 +15,6 @@ window.REELS = {
     { name: 'suheeson-clear-water', caption: 'suheeson — Clear Water',  order: 2 },
     { name: 'saeglopur-teaser-1', caption: 'saeglopur — Copied September', order: 3 },
     { name: 'donizanai-teaser-1', caption: 'donizanai — MADRUGADA', order: 4 },
+    { name: 'eeajik-teaser-1', caption: 'eeajik — ambient #1', order: 5 },
   ],
 };
