@@ -9,12 +9,13 @@
    등록된 항목 수만큼만 표시됩니다 (빈칸/예정칸 없음).                    */
 window.REELS = {
   base: 'https://pub-941aaefa2376456bbc0093aa25af3344.r2.dev/reels/',
-  sort: 'asc',
+  sort: 'desc',
   items: [
     { name: 'teaser-1',             caption: 'microclimate — teaser 1', order: 1 },
     { name: 'suheeson-clear-water', caption: 'suheeson — Clear Water',  order: 2 },
     { name: 'saeglopur-teaser-1', caption: 'saeglopur — Copied September', order: 3 },
     { name: 'donizanai-teaser-1', caption: 'donizanai — MADRUGADA', order: 4 },
     { name: 'eeajik-teaser-1', caption: 'eeajik — ambient #1', order: 5 },
+    { name: 'teaser-2', caption: 'microclimate — teaser 2', order: 6 },
   ],
 };
