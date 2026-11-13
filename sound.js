@@ -283,7 +283,14 @@ playToggle.addEventListener('click', () => {
   }
 });
 
-audioEl.addEventListener('play',  () => { playToggle.textContent = '❚❚'; });
+const countedPlays = new Set(); // 같은 곡 일시정지/재개는 한 번만 집계
+audioEl.addEventListener('play',  () => {
+  playToggle.textContent = '❚❚';
+  if (currentTrack && !countedPlays.has(currentTrack.id)) {
+    countedPlays.add(currentTrack.id);
+    window.mkTrack?.(`play/${currentTrack.id}`, `▶ ${currentTrack.title}`);
+  }
+});
 audioEl.addEventListener('pause', () => { playToggle.textContent = '▶'; });
 audioEl.addEventListener('ended', () => {
   playToggle.textContent = '▶';

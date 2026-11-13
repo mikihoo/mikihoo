@@ -193,6 +193,11 @@
     big.src = url1080(name);                       // 1080 (모바일도 동일 화질)
     big.muted = false;
     big.play().catch(function () {});
+    trackReel(items[curIndex]);
+  }
+
+  function trackReel(it) {
+    if (window.mkTrack) window.mkTrack('reel/' + it.name, '🎬 ' + (it.caption || it.name));
   }
 
   function openOverlay(it) {
@@ -208,6 +213,7 @@
       curIndex = i;                                // 이미 프리페치됨 → 버퍼에서 바로 재생
       big.muted = false;
       big.play().catch(function () {});
+      trackReel(it);
     } else {
       loadIndex(i);
     }
