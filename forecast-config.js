@@ -21,7 +21,7 @@
     },
 
     poster: 'forecast-poster.avif',
-    entry:  { time: '17:50', label: '입장' },
+    entry:  { time: '17:45', label: '입장' },
 
     // 출연 순서 = 표시 순서. icon은 채음 아이콘 세트 코드(임시) — 나중에 교체 쉬움
     lineup: [
