@@ -38,11 +38,16 @@
 
     <!-- 오른쪽: 텍스트 -->
     <div class="forecast-right">
-      <div class="forecast-label">예보 / 豫報</div>
+      <div class="forecast-label" id="fcLabel">예보 / 豫報</div>
       <h1 class="forecast-title">microclimate<span class="forecast-title-ko">미기후</span></h1>
-      <div class="forecast-meta">2026.11.14 (토) 18:00 · 무대륙</div>
+      <div class="forecast-meta" id="fcMeta">2026.11.14 (토) 18:00 · 무대륙</div>
 
-      <a class="btn-submit forecast-book forecast-book-top" href="https://forms.gle/h5VyYCmng4u1uvPZ9" target="_blank" rel="noopener noreferrer">예매하기</a>
+      <div class="fc-notice" data-phase="dday">
+        <p>사전 예매가 마감되었습니다.</p>
+        <p>오늘 17:50 입장 · 18:00 시작</p>
+      </div>
+
+      <a class="btn-submit forecast-book forecast-book-top" data-phase="before" href="https://forms.gle/h5VyYCmng4u1uvPZ9" target="_blank" rel="noopener noreferrer">예매하기</a>
 
       <blockquote class="forecast-quote">
         쓰고, 쓰고, 또 쓰게 하라. 기록하고 보존하게 하라. 노아의 방주처럼 되게 하라. 크든 작든, 정결하든 부정하든 모든 생물이 있어야 하나니, 모든 종류와 모든 이야기에서 하나씩 데려오라.
@@ -57,22 +62,22 @@
       </div>
 
       <section class="forecast-section">
-        <div class="entries-label">시간대별 예보</div>
+        <div class="entries-label" id="fcTtLabel">시간대별 예보</div>
         <div class="fc-timetable" id="fcTimetable"></div>
       </section>
 
-      <section class="forecast-section">
+      <section class="forecast-section" data-phase="before dday">
         <div class="entries-label">관측 안내</div>
         <div class="fc-info">
           <p>서울 마포구 토정로5길 12, 무대륙</p>
           <p>스탠딩 및 일부 좌석으로 진행</p>
           <p>주류 및 음료 섭취 가능 (1F에서 구매 가능)</p>
           <p>500ml 이하 음료 외 식음료 반입 불가</p>
-          <p>입금 후 폼 작성 · 입금 확인 후 예매 확정 메일 발송</p>
+          <p data-phase="before">입금 후 폼 작성 · 입금 확인 후 예매 확정 메일 발송</p>
         </div>
       </section>
 
-      <a class="btn-submit forecast-book" href="https://forms.gle/h5VyYCmng4u1uvPZ9" target="_blank" rel="noopener noreferrer">예매하기</a>
+      <a class="btn-submit forecast-book" data-phase="before" href="https://forms.gle/h5VyYCmng4u1uvPZ9" target="_blank" rel="noopener noreferrer">예매하기</a>
     </div>
 
   </main>

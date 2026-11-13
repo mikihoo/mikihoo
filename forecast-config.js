@@ -1,11 +1,15 @@
 /* ── 예보(공연) 설정 — 탭 이름/위치, 공연 정보, 라인업을 한 곳에서 관리 ──
-   공연 후 "관측"으로 바꾸려면 아래 nav.label / nav.position 만 수정하면 됩니다.
-   (예: label:'관측', position: 99 → 맨 뒤로)                                  */
+   페이지는 날짜(KST)에 따라 자동으로 바뀝니다.
+     before (~11.13) : 예보 — 예매하기 노출
+     dday   (11.14)  : 예매 마감 + 당일 안내
+     after  (11.15~) : 관측 — 탭 이름 '관측', 맨 뒤로 이동, 예매/안내 숨김
+   미리보기: forecast.html?phase=dday  /  ?phase=after                        */
 (function () {
   'use strict';
 
   var FC = {
-    nav:  { label: '예보', position: 0 },          // position 0 = 맨 앞 / 99 = 맨 뒤
+    nav:      { label: '예보', position: 0 },      // position 0 = 맨 앞 / 99 = 맨 뒤
+    navAfter: { label: '관측', position: 99 },     // 공연 다음 날부터
     href: 'forecast.html',
 
     event: {
@@ -29,7 +33,15 @@
   };
 
   // ── D-day (KST 기준 달력일 차이) ──
+  var PHASES = { before: 1, dday: 1, after: 1 };
+  var override = null;
+  try { override = new URLSearchParams(location.search).get('phase'); } catch (e) {}
+  if (!PHASES[override]) override = null;
+
   FC.dday = function () {
+    if (override === 'before') return { phase: 'before', label: 'D-1', days: 1 };
+    if (override === 'dday')   return { phase: 'dday', label: 'D-DAY', days: 0 };
+    if (override === 'after')  return { phase: 'after', label: '', days: -1 };
     var now = new Date();
     var utc = now.getTime() + now.getTimezoneOffset() * 60000;
     var kst = new Date(utc + 9 * 3600000);
@@ -60,11 +72,12 @@
       if (nav.querySelector('[data-forecast-nav]')) return;
       var a = document.createElement('a');
       a.href = FC.href;
-      a.textContent = FC.nav.label;
+      var navCfg = FC.active() ? FC.nav : FC.navAfter;
+      a.textContent = navCfg.label;
       a.setAttribute('data-forecast-nav', '');
       if (onForecast) a.classList.add('active');
       var kids = Array.prototype.slice.call(nav.children);
-      var pos = Math.max(0, Math.min(FC.nav.position, kids.length));
+      var pos = Math.max(0, Math.min(navCfg.position, kids.length));
       if (pos >= kids.length) nav.appendChild(a);
       else nav.insertBefore(a, kids[pos]);
     });

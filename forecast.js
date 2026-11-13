@@ -4,6 +4,20 @@
   var FC = window.FORECAST;
   if (!FC) return;
 
+  // ── 날짜 단계별 표시 (before / dday / after) ──
+  var phase = FC.dday().phase;
+  document.querySelectorAll('[data-phase]').forEach(function (el) {
+    var show = el.getAttribute('data-phase').split(/\s+/).indexOf(phase) >= 0;
+    if (!show) el.remove();
+  });
+  if (phase === 'after') {
+    var setText = function (id, t) { var el = document.getElementById(id); if (el) el.textContent = t; };
+    setText('fcLabel', '관측 / 觀測');
+    setText('fcMeta', FC.event.dateLabel.replace(/\s*\d{1,2}:\d{2}$/, '') + ' · ' + FC.event.venue + ' — 관측 종료');
+    setText('fcTtLabel', '시간대별 관측');
+    document.title = '관측 — mikihoo';
+  }
+
   // ── 날씨 아이콘 (채음/날씨 탭과 동일 세트) ──
   function weatherIconSvg(code) {
     if (!code) return '';
