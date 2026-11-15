@@ -86,11 +86,11 @@
   <!-- 관측 기록 (영상) — 전체 폭 -->
   <section class="reels" aria-label="관측 기록">
     <div class="forecast-label">관측 기록 / 觀測記錄</div>
-    <div class="reel-strip" id="reelStrip"></div>
+    <div class="reel-strip" id="reelStrip" data-reels="microclimate-2026"></div>
   </section>
 
-  <!-- 관측 사진 — 회차별 그리드 + 라이트박스 (photos.js) -->
-  <section class="obs-photos" id="obsPhotos" data-phase="after" aria-label="관측 사진"></section>
+  <!-- 관측 사진 미리보기 → 관측 페이지 (photos.js) -->
+  <section class="obs-photos obs-preview" id="obsPreview" data-tag="microclimate-2026" data-phase="after" aria-label="관측 사진"></section>
 
   <footer class="site-footer">
     <span>mikihoo &copy; 2026</span>
@@ -104,10 +104,11 @@
 
   <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
   <script src="lenis-init.js"></script>
-  <script src="reels.js"></script>
   <script src="forecast.js"></script>
   <script src="photos.js"></script>
   <script src="photos-gallery.js"></script>
+  <script src="reels.js"></script>
+  <script src="reels-player.js"></script>
   <script src="grain.js"></script>
   <script src="header-particles.js"></script>
 </body>

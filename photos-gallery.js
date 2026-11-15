@@ -1,24 +1,33 @@
-/* ── 관측 사진 (갤러리 + 라이트박스) ───────────────────────────────
+/* ── 관측 사진 ─────────────────────────────────────────────────────
    데이터: photos.js (scripts/add-photos.py 가 생성)
-   로컬 미리보기: ?photos=local → photos/processed/ 에서 읽음            */
+   · 관측 페이지  #obsPhotos            태그별 섹션(영상 + 관측 띠 + 사진) · 태그 필터 · 라이트박스
+   · 미기후 페이지 #obsPreview[data-tag] 관측 띠 + 미리보기 줄 → 관측 페이지로 연결
+   주소: observe.html?tag=<태그id>&p=<사진 f>  (태그 필터 / 사진 바로 열기)
+   로컬 미리보기: ?photos=local → photos/processed/ 에서 읽음                          */
 (function () {
   'use strict';
 
   var P = window.PHOTOS;
-  var root = document.getElementById('obsPhotos');
-  if (!P || !root || !P.batches || !P.batches.length) { if (root) root.remove(); return; }
+  var full = document.getElementById('obsPhotos');
+  var preview = document.getElementById('obsPreview');
+  if (!P || !P.tags || !P.tags.length) {
+    if (preview) preview.remove();
+    if (full) full.innerHTML = '<p class="obs-empty">아직 관측된 것이 없습니다.</p>';
+    return;
+  }
 
-  var base = P.base;
-  try { if (new URLSearchParams(location.search).get('photos') === 'local') base = 'photos/processed/'; } catch (e) {}
+  var qs; try { qs = new URLSearchParams(location.search); } catch (e) { qs = { get: function () { return null; } }; }
+  var local = qs.get('photos') === 'local';
+  var base = local ? 'photos/processed/' : P.base;
+  var keep = local ? '&photos=local' : '';     // 로컬 미리보기 중엔 링크에도 유지
 
-  var venue = (window.FORECAST && window.FORECAST.event.venue) || '';
-  var batches = P.batches.slice();
-  if (P.sort === 'desc') batches.reverse();
-
-  var thumbUrl = function (b, it) { return base + b.id + '/' + it.f + '-t.avif'; };
-  var fullUrl  = function (b, it) { return base + b.id + '/' + it.f + '.avif'; };
+  var thumbUrl = function (t, it) { return base + t.id + '/' + it.f + '-t.avif'; };
+  var fullUrl  = function (t, it) { return base + t.id + '/' + it.f + '.avif'; };
+  var observeUrl = function (t, it) {
+    return 'observe.html?tag=' + encodeURIComponent(t.id) + (it ? '&p=' + encodeURIComponent(it.f) : '') + keep;
+  };
   var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
 
   // 조도(lux) — 노출값에서 역산한 그 순간 그 자리의 밝기 (입사광 노출계 C=250 기준)
   function lux(it) {
@@ -29,7 +38,6 @@
     return 2.5 * Math.pow(2, ev100);
   }
   function fmtLux(v) { return v < 10 ? v.toFixed(1) : String(Math.round(v)); }
-
   function exposure(it) {
     var r = [];
     if (it.ss)  r.push(it.ss);
@@ -42,70 +50,122 @@
     var l = lux(it);
     return (l != null ? '조도 ' + fmtLux(l) + ' lx  ·  ' : '') + exposure(it);
   }
-  function outdoor(b) {
-    var w = b.wx;
-    if (!w) return '';
-    return '밖 ' + w.t + '°C · 습도 ' + w.rh + '% · ' + w.wd + ' ' + w.ws + 'm/s' + (w.sky ? ' · ' + w.sky : '') + ' (' + w.at + ')';
+  function dayLine(d) {
+    var s = d.date + (d.venue ? ' · ' + d.venue : '');
+    var w = d.wx;
+    if (w) s += ' — 바깥 ' + w.t + '°C' + (w.sky ? ' · ' + w.sky : '') + ' · 습도 ' + w.rh + '% · ' + w.wd + ' ' + w.ws + 'm/s (' + w.at + ')';
+    return s;
   }
-  function indoor(b) {
-    var ls = b.items.map(lux).filter(function (v) { return v != null; });
+  function luxLine(items) {
+    var ls = items.map(lux).filter(function (v) { return v != null; });
     if (!ls.length) return '';
-    return '안 조도 ' + fmtLux(Math.min.apply(null, ls)) + '–' + fmtLux(Math.max.apply(null, ls)) + ' lx';
+    return '조도 — 가장 어두운 곳 ' + fmtLux(Math.min.apply(null, ls)) + ' lx · 가장 밝은 곳 ' + fmtLux(Math.max.apply(null, ls)) + ' lx';
+  }
+  function stripes(t, keyOf) {
+    return '<div class="obs-stripes" aria-hidden="true">' + t.items.map(function (it, i) {
+      return '<i data-k="' + keyOf(i) + '" style="--c:' + (it.c || '#333') + '"></i>';
+    }).join('') + '</div>';
+  }
+  function fog(scope) {
+    scope.querySelectorAll('img.obs-fog').forEach(function (img) {
+      var done = function () { img.classList.add('in'); };
+      if (img.complete && img.naturalWidth) done(); else img.addEventListener('load', done);
+    });
+  }
+  function hlBind(scope) {
+    function hl(k, on) {
+      scope.querySelectorAll('[data-k="' + k + '"]').forEach(function (el) { el.classList.toggle('hl', on); });
+      var ph = scope.querySelector('.obs-ph[data-k="' + k + '"]');
+      if (ph) ph.parentNode.classList.toggle('dim', on);
+    }
+    scope.querySelectorAll('[data-k]').forEach(function (el) {
+      el.addEventListener('mouseenter', function () { hl(el.dataset.k, true); });
+      el.addEventListener('mouseleave', function () { hl(el.dataset.k, false); });
+    });
   }
 
-  // 라이트박스 순회용 평면 목록 (회차를 넘나들며 이어짐)
-  var flat = [];
+  /* ── 미기후 페이지: 미리보기 ───────────────────────────────── */
+  if (preview) {
+    var pt = P.tags.filter(function (t) { return t.id === preview.dataset.tag; })[0];
+    if (!pt || !pt.items.length) { preview.remove(); }
+    else {
+      var N = 8;
+      var html = '<div class="forecast-label">관측 사진 / 觀測寫眞</div>' +
+        stripes(pt, function (i) { return i; }) +
+        '<div class="obs-pv-row">';
+      pt.items.slice(0, N).forEach(function (it, i) {
+        html += '<a class="obs-ph obs-pv" data-k="' + i + '" href="' + observeUrl(pt, it) + '" style="--ar:' + (it.w / it.h).toFixed(4) + ';--c:' + (it.c || '#333') + '">' +
+                  '<img class="obs-fog" loading="lazy" decoding="async" alt="" src="' + thumbUrl(pt, it) + '" /></a>';
+      });
+      html += '</div><a class="obs-link" href="' + observeUrl(pt) + '">관측 사진 ' + pt.items.length + '장 · 영상 모두 보기 →</a>';
+      preview.innerHTML = html;
+      preview.querySelectorAll('.obs-stripes i').forEach(function (el) {
+        el.addEventListener('click', function () { location.href = observeUrl(pt, pt.items[+el.dataset.k]); });
+      });
+      fog(preview); hlBind(preview);
+    }
+  }
 
-  // ── 그리드 렌더 ──
-  var html = '<div class="forecast-label">관측 사진 / 觀測寫眞</div>';
-  batches.forEach(function (b) {
-    html += '<section class="obs-batch">' +
+  if (!full) return;
+
+  /* ── 관측 페이지: 태그별 섹션 ─────────────────────────────── */
+  var flat = [];             // 라이트박스 순회용 (보이는 태그만)
+  var html2 = '';
+  P.tags.forEach(function (t) {
+    var start = flat.length;
+    t.items.forEach(function (it, i) { flat.push({ t: t, it: it, n: i + 1, total: t.items.length }); });
+    html2 += '<section class="obs-tag" data-tag="' + esc(t.id) + '">' +
       '<header class="obs-batch-head">' +
-        '<span class="obs-batch-title">' + esc(b.label) + '</span>' +
-        '<span class="obs-batch-meta">' + esc([b.date, venue].filter(Boolean).join(' · ')) +
-          ' — ' + b.items.length + ' frames</span>' +
+        '<span class="obs-batch-title">' + esc(t.label) + '</span>' +
+        (t.href ? '<a class="obs-link" href="' + esc(t.href) + '">' + esc(t.label.replace(/^\d{4}\s*/, '')) + ' 페이지 →</a>' : '') +
       '</header>' +
       '<div class="obs-climate">' +
-        (b.wx ? '<span>' + esc(outdoor(b)) + '</span>' : '') +
-        '<span>' + esc(indoor(b)) + '</span>' +
+        (t.days || []).map(function (d) {
+          var dayItems = t.items.filter(function (it) { return it.d === d.date; });
+          return '<span>' + esc(dayLine(d)) + '</span><span>' + esc(luxLine(dayItems.length ? dayItems : t.items)) + '</span>';
+        }).join('') +
       '</div>' +
-      '<div class="obs-stripes" aria-hidden="true">';
-    b.items.forEach(function (it, i) {
-      html += '<i data-k="' + (flat.length + i) + '" style="--c:' + (it.c || '#333') + '"></i>';
-    });
-    html += '</div><div class="obs-grid">';
-    b.items.forEach(function (it, i) {
+      '<div class="obs-sub" data-reels-wrap><div class="obs-sub-label">영상</div>' +
+        '<div class="reel-strip" data-reels="' + esc(t.id) + '"></div></div>' +
+      '<div class="obs-sub"><div class="obs-sub-label">사진 — ' + t.items.length + '</div>' +
+        stripes(t, function (i) { return start + i; }) +
+        '<div class="obs-grid">';
+    t.items.forEach(function (it, i) {
       var ar = (it.w && it.h) ? it.w / it.h : 1.5;
-      var k = flat.length;
-      flat.push({ b: b, it: it, n: i + 1, total: b.items.length });
-      html += '<button type="button" class="obs-ph" data-k="' + k + '" style="--ar:' + ar.toFixed(4) + ';--c:' + (it.c || '#333') + '"' +
-                ' aria-label="' + esc(b.label + ' ' + pad(i + 1)) + '">' +
-                '<img loading="lazy" decoding="async" alt="" width="' + it.w + '" height="' + it.h + '" src="' + thumbUrl(b, it) + '" />' +
+      html2 += '<button type="button" class="obs-ph" data-k="' + (start + i) + '" style="--ar:' + ar.toFixed(4) + ';--c:' + (it.c || '#333') + '"' +
+                ' aria-label="' + esc(t.label + ' ' + pad(i + 1)) + '">' +
+                '<img class="obs-fog" loading="lazy" decoding="async" alt="" width="' + it.w + '" height="' + it.h + '" src="' + thumbUrl(t, it) + '" />' +
                 '<span class="obs-ph-data"><span class="obs-ph-no">' + pad(i + 1) + '</span>' + esc(readout(it)) + '</span>' +
               '</button>';
     });
-    html += '<i class="obs-fill" aria-hidden="true"></i></div></section>';
+    html2 += '<i class="obs-fill" aria-hidden="true"></i></div></div></section>';
   });
-  root.innerHTML = html;
+  full.innerHTML = html2;
+  fog(full); hlBind(full);
 
-  // 관측 띠 ↔ 사진 연동 (호버 강조, 띠 클릭 = 열기)
-  function hl(k, on) {
-    root.querySelectorAll('[data-k="' + k + '"]').forEach(function (el) { el.classList.toggle('hl', on); });
-    var grid = root.querySelector('.obs-ph[data-k="' + k + '"]');
-    if (grid) grid.parentNode.classList.toggle('dim', on);
+  // ── 태그 필터 ──
+  var chipsEl = document.getElementById('obsTags');
+  var activeTag = qs.get('tag');
+  if (!P.tags.some(function (t) { return t.id === activeTag; })) activeTag = '';
+  function applyTag(id, push) {
+    activeTag = id;
+    full.querySelectorAll('.obs-tag').forEach(function (s) { s.hidden = !!id && s.dataset.tag !== id; });
+    if (chipsEl) chipsEl.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b.dataset.tag === id); });
+    if (push) {
+      var u = 'observe.html' + (id ? '?tag=' + encodeURIComponent(id) + keep : (local ? '?photos=local' : ''));
+      history.replaceState(null, '', u);
+    }
   }
-  root.querySelectorAll('[data-k]').forEach(function (el) {
-    el.addEventListener('mouseenter', function () { hl(el.dataset.k, true); });
-    el.addEventListener('mouseleave', function () { hl(el.dataset.k, false); });
-  });
-  root.querySelectorAll('.obs-stripes i').forEach(function (el) {
-    el.addEventListener('click', function () { open(+el.dataset.k); });
-  });
-
-  root.querySelectorAll('.obs-ph img').forEach(function (img) {
-    var done = function () { img.classList.add('in'); };
-    if (img.complete && img.naturalWidth) done(); else img.addEventListener('load', done);
-  });
+  if (chipsEl) {
+    chipsEl.innerHTML = '<button type="button" data-tag="">전체</button>' + P.tags.map(function (t) {
+      return '<button type="button" data-tag="' + esc(t.id) + '">' + esc(t.label) + '</button>';
+    }).join('');
+    chipsEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (b) applyTag(b.dataset.tag, true);
+    });
+  }
+  applyTag(activeTag, false);
 
   // ── 라이트박스 ──
   var lb = document.createElement('div');
@@ -114,7 +174,7 @@
   lb.setAttribute('aria-modal', 'true');
   lb.setAttribute('aria-label', '관측 사진');
   lb.innerHTML =
-    '<div class="obs-lb-top"><span class="obs-lb-label"></span></div>' +
+    '<div class="obs-lb-top"><span class="obs-lb-label"></span><a class="obs-lb-link"></a></div>' +
     '<div class="obs-lb-stage">' +
       '<img class="obs-lb-thumb" alt="" />' +
       '<img class="obs-lb-full" alt="" />' +
@@ -129,14 +189,25 @@
   var imgT   = lb.querySelector('.obs-lb-thumb');
   var imgF   = lb.querySelector('.obs-lb-full');
   var elLab  = lb.querySelector('.obs-lb-label');
+  var elLink = lb.querySelector('.obs-lb-link');
   var elCnt  = lb.querySelector('.obs-lb-count');
   var elData = lb.querySelector('.obs-lb-data');
   var cur = -1, savedOverflow = '', lastFocus = null;
   var preload = {};
 
+  // 보이는(필터된) 사진들 안에서만 순회
+  function visibleKeys() {
+    var ks = [];
+    flat.forEach(function (e, k) { if (!activeTag || e.t.id === activeTag) ks.push(k); });
+    return ks;
+  }
+  function step(k, dir) {
+    var ks = visibleKeys(), i = ks.indexOf(k);
+    return ks[(i + dir + ks.length) % ks.length];
+  }
   function warm(k) {
-    var e = flat[(k + flat.length) % flat.length];
-    var u = fullUrl(e.b, e.it);
+    var e = flat[k];
+    var u = fullUrl(e.t, e.it);
     if (preload[u]) return;
     preload[u] = new Image();
     preload[u].decoding = 'async';
@@ -144,22 +215,24 @@
   }
 
   function show(k) {
-    cur = (k + flat.length) % flat.length;
+    cur = k;
     var e = flat[cur];
+    var day = (e.t.days || []).filter(function (d) { return d.date === e.it.d; })[0];
     stage.style.setProperty('--ar', (e.it.w / e.it.h).toFixed(4));
     lb.style.setProperty('--c', e.it.c || '#333');
     imgF.classList.remove('in');
     imgF.removeAttribute('src');
-    imgT.src = thumbUrl(e.b, e.it);                 // 썸네일 먼저 → 원본으로 교체
-    var u = fullUrl(e.b, e.it);
+    imgT.src = thumbUrl(e.t, e.it);                 // 안개(흐린 썸네일) 먼저 → 원본으로 걷힘
+    var u = fullUrl(e.t, e.it);
     imgF.onload = function () { if (imgF.getAttribute('src') === u) imgF.classList.add('in'); };
     imgF.src = u;
-    elLab.textContent = e.b.label + (e.b.date ? ' — ' + e.b.date : '') + (e.it.cap ? '  ·  ' + e.it.cap : '');
+    elLab.textContent = e.t.label + (e.it.d ? ' — ' + e.it.d : '') + (day && day.venue ? ' · ' + day.venue : '') + (e.it.cap ? '  ·  ' + e.it.cap : '');
+    if (e.t.href) { elLink.href = e.t.href; elLink.textContent = e.t.label.replace(/^\d{4}\s*/, '') + ' 페이지 →'; elLink.hidden = false; }
+    else elLink.hidden = true;
     elCnt.textContent = pad(e.n) + ' / ' + pad(e.total);
-    var l = lux(e.it);
-    elData.textContent = (l != null ? '조도 ' + fmtLux(l) + ' lx  ·  ' : '') + exposure(e.it);
-    warm(cur + 1); warm(cur - 1);
-    if (window.mkTrack) window.mkTrack('photo/' + e.b.id + '/' + e.it.f, '📷 ' + e.b.label + ' ' + pad(e.n));
+    elData.textContent = readout(e.it);
+    warm(step(cur, 1)); warm(step(cur, -1));
+    if (window.mkTrack) window.mkTrack('photo/' + e.t.id + '/' + e.it.f, '📷 ' + e.t.label + ' ' + pad(e.n));
   }
 
   function open(k) {
@@ -179,11 +252,11 @@
   }
   function nav(dir) {
     stage.classList.add('swap');
-    setTimeout(function () { show(cur + dir); stage.style.transform = ''; stage.classList.remove('swap'); }, 140);
+    setTimeout(function () { show(step(cur, dir)); stage.style.transform = ''; stage.classList.remove('swap'); }, 140);
   }
 
-  root.addEventListener('click', function (e) {
-    var t = e.target.closest('.obs-ph');
+  full.addEventListener('click', function (e) {
+    var t = e.target.closest('.obs-ph, .obs-stripes i');
     if (t) open(+t.dataset.k);
   });
   lb.querySelector('.obs-lb-close').addEventListener('click', close);
@@ -240,4 +313,16 @@
     else if (axis === 'x' && Math.abs(dx) > 60) nav(dx < 0 ? 1 : -1);
     else { stage.style.transform = ''; lb.style.background = ''; }
   });
+
+  // ── 주소로 사진 바로 열기 (?p=) — 미기후 페이지 미리보기에서 넘어올 때 ──
+  var pf = qs.get('p');
+  if (pf) {
+    var k = -1;
+    flat.forEach(function (e, i) { if (k < 0 && e.it.f === pf && (!activeTag || e.t.id === activeTag)) k = i; });
+    if (k >= 0) {
+      var ph = full.querySelector('.obs-ph[data-k="' + k + '"]');
+      if (ph) ph.scrollIntoView({ block: 'center' });
+      open(k);
+    }
+  }
 })();

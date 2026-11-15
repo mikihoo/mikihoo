@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """
 관측 사진 추가 스크립트
-원본 JPG 폴더 하나 = 관측 회차(batch) 하나. 색/톤 보정 없이 AVIF 로만 압축합니다.
+원본 폴더 하나를 태그(예: 2026 미기후) 아래에 쌓습니다. 색/톤 보정 없이 AVIF 로만 압축.
 
-  처리 → (R2 업로드) → photos.js 에 회차 블록 생성/갱신 까지 한 번에.
+  처리 → (R2 업로드) → photos.js 갱신 까지 한 번에.
 
 사용법:
-  scripts/add-photos.py "<원본 폴더>" <회차id> "<라벨>" [--time 18:00] [--no-upload]
+  scripts/add-photos.py "<원본 폴더>" <태그id> ["<태그 이름>"] [옵션]
 예:
-  scripts/add-photos.py "관측 사진/1차" 1 "1차 관측"
-  scripts/add-photos.py "관측 사진/2차" 2 "2차 관측" --time 19:30
-  scripts/add-photos.py "관측 사진/2차" 2 "2차 관측" --no-upload   # 변환만 (로컬 미리보기)
+  scripts/add-photos.py "관측 사진/1차" microclimate-2026 "2026 미기후"   # 새 태그
+  scripts/add-photos.py "관측 사진/2차" microclimate-2026                  # 같은 태그에 쌓기
+  scripts/add-photos.py "관측 사진/2차" microclimate-2026 --no-upload      # 변환만 (로컬 미리보기)
 
-  --time      그날 바깥 날씨를 기록할 시각 (기본 18:00, 공연 시작)
-  --lat/--lon 관측 장소 좌표 (기본 무대륙)
+옵션:
+  --href forecast.html   태그에서 이어지는 페이지 (새 태그일 때만, 기본 forecast.html)
+  --venue 무대륙          관측 장소 이름 (기본 무대륙)
+  --lat/--lon            장소 좌표 (기본 무대륙) — 그날 바깥 날씨용
+  --time 18:00           그날 바깥 날씨를 기록할 시각 (기본 18:00, 공연 시작)
+  --no-upload            R2 업로드 생략
 
 결과물:
-  photos/processed/<회차id>/<이름>.avif     원본 해상도 · q95 · 4:4:4 (최대화질)
-  photos/processed/<회차id>/<이름>-t.avif   그리드용 1400px · q90 · 4:4:4
-  R2: s3://$R2_BUCKET/photos/<회차id>/...
-  photos.js: 노출값(ISO/셔터/조리개/화각), 크기, 빛의 색(c), 그날 바깥 날씨(wx)를 자동 기록. 순서/캡션은 손으로 고쳐도 됨
-             (다시 돌리면 이미 있는 항목의 순서·캡션은 유지).
+  photos/processed/<태그id>/<YYYYMMDD-이름>.avif     원본 해상도 · q95 · 4:4:4 (최대화질)
+  photos/processed/<태그id>/<YYYYMMDD-이름>-t.avif   그리드용 1400px · q90 · 4:4:4
+  R2: s3://$R2_BUCKET/photos/<태그id>/...
+  photos.js: 날짜별(days) 장소·바깥 날씨, 사진별 노출값·빛의 색을 자동 기록.
+             순서·cap(캡션)은 손으로 고쳐도 다시 돌릴 때 유지됨 (JSON 형식이라 큰따옴표 유지).
 
-로컬 미리보기: forecast.html?phase=after&photos=local  → photos/processed/ 에서 읽음
+로컬 미리보기: observe.html?photos=local  → photos/processed/ 에서 읽음
 R2 인증: .env 의 R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (R2_BUCKET 기본 mikihoo-music)
 필요 도구: avifenc, magick, exiftool, aws(cli)
 """
@@ -34,20 +38,30 @@ ROOT = Path(__file__).resolve().parent.parent
 os.chdir(ROOT)
 
 ap = argparse.ArgumentParser(usage=__doc__)
-ap.add_argument('src'); ap.add_argument('batch'); ap.add_argument('label')
-ap.add_argument('--time', default='18:00')
+ap.add_argument('src'); ap.add_argument('tag'); ap.add_argument('label', nargs='?')
+ap.add_argument('--href', default='forecast.html')
+ap.add_argument('--venue', default='무대륙')
 ap.add_argument('--lat', type=float, default=37.5486)   # 무대륙 (마포 토정로5길)
 ap.add_argument('--lon', type=float, default=126.9204)
+ap.add_argument('--time', default='18:00')
 ap.add_argument('--no-upload', action='store_true')
 A = ap.parse_args()
-SRC, BATCH, LABEL, NO_UPLOAD = Path(A.src), A.batch, A.label, A.no_upload
-if not re.fullmatch(r'[a-z0-9-]+', BATCH):
-    sys.exit('회차id 는 영문소문자/숫자/하이픈만 (예: 1, 2, encore-1)')
+SRC, TAG = Path(A.src), A.tag
+if not re.fullmatch(r'[a-z0-9-]+', TAG):
+    sys.exit('태그id 는 영문소문자/숫자/하이픈만 (예: microclimate-2026)')
 if not re.fullmatch(r'\d{1,2}:\d{2}', A.time):
     sys.exit('--time 은 HH:MM (예: 18:00)')
 
-OUT = ROOT / 'photos' / 'processed' / BATCH
+OUT = ROOT / 'photos' / 'processed' / TAG
 MANIFEST = ROOT / 'photos.js'
+HEADER = """/* ── 관측 사진 데이터 — scripts/add-photos.py 가 갱신합니다 ──────────
+   tags: 위에 있을수록 최근. 태그 하나 = 사진 묶음 (예: 2026 미기후)
+     href  태그에서 이어지는 페이지 (미기후 페이지 등)
+     days  날짜별 장소·바깥 날씨 (wx: at 시각, t 기온, rh 습도, ws 풍속 m/s, wd 풍향, sky 하늘)
+     items 사진 (f 파일, d 날짜, w/h 픽셀, iso, ss 셔터, fn 조리개, mm 화각, c 빛의 색, cap 캡션)
+   순서·cap 은 손으로 고쳐도 됨 (JSON 형식 — 큰따옴표 유지).
+   URL: base + <태그id>/<f>.avif (원본) / <f>-t.avif (그리드용)                */
+window.PHOTOS = """
 
 # .env 읽기
 env = dict(os.environ)
@@ -63,8 +77,23 @@ if not SRC.is_dir():
 files = sorted(p for p in SRC.iterdir() if p.suffix.lower() in ('.jpg', '.jpeg', '.png', '.tif', '.tiff'))
 if not files:
     sys.exit(f'원본 사진이 없습니다: {SRC}')
-OUT.mkdir(parents=True, exist_ok=True)
 
+# 기존 데이터
+data = {'base': 'https://pub-941aaefa2376456bbc0093aa25af3344.r2.dev/photos/', 'tags': []}
+if MANIFEST.exists():
+    txt = MANIFEST.read_text()
+    body = txt[txt.index('window.PHOTOS =') + len('window.PHOTOS ='):].strip().rstrip(';')
+    data = json.loads(body)
+tag = next((t for t in data['tags'] if t['id'] == TAG), None)
+if not tag:
+    if not A.label:
+        sys.exit(f'새 태그입니다 — 태그 이름도 넣어주세요: scripts/add-photos.py "{SRC}" {TAG} "2026 미기후"')
+    tag = {'id': TAG, 'label': A.label, 'href': A.href, 'days': [], 'items': []}
+    data['tags'].insert(0, tag)
+elif A.label:
+    tag['label'] = A.label
+
+OUT.mkdir(parents=True, exist_ok=True)
 meta = json.loads(subprocess.check_output(
     ['exiftool', '-json', '-n', '-DateTimeOriginal', '-FocalLength', '-FNumber',
      '-ExposureTime', '-ISO', '-ImageWidth', '-ImageHeight', '-Orientation', *map(str, files)]))
@@ -116,43 +145,65 @@ def run(cmd):
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
 
 
-items, dates = [], []
-print(f'▸ 처리: {SRC} → photos/processed/{BATCH}/  ({len(files)}장)')
+exif_date = {p.name: str(meta.get(p.name, {}).get('DateTimeOriginal', ''))[:10].replace(':', '.') for p in files}
+common = Counter(d for d in exif_date.values() if d).most_common(1)
+fallback = common[0][0] if common else ''
+
+prev = {it['f']: it for it in tag['items']}
+new_items = []
+print(f'▸ 처리: {SRC} → photos/processed/{TAG}/  ({len(files)}장)')
 for p in files:
-    stem = re.sub(r'[^A-Za-z0-9_-]', '-', p.stem)
+    d = exif_date[p.name] or fallback
+    stem = (d.replace('.', '') + '-' if d else '') + re.sub(r'[^A-Za-z0-9_-]', '-', p.stem)
     m = meta.get(p.name, {})
     w, h = int(m.get('ImageWidth', 0)), int(m.get('ImageHeight', 0))
     if m.get('Orientation') in (5, 6, 7, 8):
         w, h = h, w
     full, thumb = OUT / f'{stem}.avif', OUT / f'{stem}-t.avif'
 
-    with tempfile.TemporaryDirectory() as td:
-        # 회전만 픽셀에 반영 (색/톤은 그대로, ICC 유지)
-        src = Path(td) / 'src.png'
-        run(['magick', str(p), '-auto-orient', str(src)])
-        if not full.exists():
-            run(['avifenc', '-q', '95', '--yuv', '444', '--speed', '4', '--jobs', 'all',
-                 '--ignore-exif', '--ignore-xmp', str(src), str(full)])
-        if not thumb.exists():
-            t = Path(td) / 't.png'
-            run(['magick', str(src), '-resize', '1400x1400>', str(t)])
-            run(['avifenc', '-q', '90', '--yuv', '444', '--speed', '4', '--jobs', 'all',
-                 '--ignore-exif', '--ignore-xmp', str(t), str(thumb)])
+    if not (full.exists() and thumb.exists()):
+        with tempfile.TemporaryDirectory() as td:
+            # 회전만 픽셀에 반영 (색/톤은 그대로, ICC 유지)
+            src = Path(td) / 'src.png'
+            run(['magick', str(p), '-auto-orient', str(src)])
+            if not full.exists():
+                run(['avifenc', '-q', '95', '--yuv', '444', '--speed', '4', '--jobs', 'all',
+                     '--ignore-exif', '--ignore-xmp', str(src), str(full)])
+            if not thumb.exists():
+                t = Path(td) / 't.png'
+                run(['magick', str(src), '-resize', '1400x1400>', str(t)])
+                run(['avifenc', '-q', '90', '--yuv', '444', '--speed', '4', '--jobs', 'all',
+                     '--ignore-exif', '--ignore-xmp', str(t), str(thumb)])
 
-    d = m.get('DateTimeOriginal')
-    if d:
-        dates.append(str(d)[:10].replace(':', '.'))
-    item = {'f': stem, 'w': w, 'h': h}
-    if m.get('ISO'): item['iso'] = int(m['ISO'])
-    if shutter(m.get('ExposureTime')): item['ss'] = shutter(m['ExposureTime'])
-    if m.get('FNumber'): item['fn'] = float(f"{m['FNumber']:g}")
-    if m.get('FocalLength'): item['mm'] = round(m['FocalLength'])
-    item['c'] = light_color(p)
-    items.append(item)
+    it = {'f': stem, 'd': d, 'w': w, 'h': h}
+    if m.get('ISO'): it['iso'] = int(m['ISO'])
+    if shutter(m.get('ExposureTime')): it['ss'] = shutter(m['ExposureTime'])
+    if m.get('FNumber'): it['fn'] = float(f"{m['FNumber']:g}")
+    if m.get('FocalLength'): it['mm'] = round(m['FocalLength'])
+    it['c'] = light_color(p)
+    if prev.get(stem, {}).get('cap'): it['cap'] = prev[stem]['cap']
+    if stem in prev:
+        prev[stem].clear(); prev[stem].update(it)          # 기존 자리 유지
+    else:
+        new_items.append(it)
     print(f'  {stem}  {full.stat().st_size // 1024}KB / thumb {thumb.stat().st_size // 1024}KB')
 
+# 새 사진은 붙이고, 날짜 최신순으로 (같은 날짜 안에서는 기존/손으로 고친 순서 유지)
+tag['items'] = sorted(tag['items'] + new_items, key=lambda x: x.get('d', ''), reverse=True)
+
+# 날짜별 장소·바깥 날씨
+for d in sorted({exif_date[p.name] or fallback for p in files} - {''}):
+    day = next((x for x in tag['days'] if x['date'] == d), None)
+    wx = outdoor_weather(d)
+    if not day:
+        day = {'date': d, 'venue': A.venue}
+        tag['days'].append(day)
+    day['venue'] = A.venue
+    if wx: day['wx'] = wx
+tag['days'].sort(key=lambda x: x['date'], reverse=True)
+
 # ── R2 업로드 ──
-if not NO_UPLOAD:
+if not A.no_upload:
     for k in ('R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'):
         if not env.get(k):
             sys.exit(f'{k} 가 없습니다 (.env). 변환만 하려면 --no-upload')
@@ -160,67 +211,31 @@ if not NO_UPLOAD:
     endpoint = f"https://{env['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com"
     aenv = {**env, 'AWS_ACCESS_KEY_ID': env['R2_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': env['R2_SECRET_ACCESS_KEY'], 'AWS_DEFAULT_REGION': 'auto'}
-    print(f'▸ 업로드: s3://{bucket}/photos/{BATCH}/')
-    subprocess.run(['aws', 's3', 'sync', str(OUT), f's3://{bucket}/photos/{BATCH}/',
+    print(f'▸ 업로드: s3://{bucket}/photos/{TAG}/')
+    subprocess.run(['aws', 's3', 'sync', str(OUT), f's3://{bucket}/photos/{TAG}/',
                     '--endpoint-url', endpoint, '--exclude', '*', '--include', '*.avif',
                     '--content-type', 'image/avif', '--cache-control', 'public, max-age=31536000, immutable',
                     '--only-show-errors'], check=True, env=aenv)
 
-# ── photos.js 갱신 (회차 블록 단위) ──
-date = Counter(dates).most_common(1)[0][0] if dates else ''
-wx = outdoor_weather(date) if date else None
-src_text = MANIFEST.read_text() if MANIFEST.exists() else ''
-start, end = f'/* @batch {BATCH} */', f'/* @end {BATCH} */'
-block_re = re.compile(re.escape(start) + r'.*?' + re.escape(end), re.S)
-
-old = block_re.search(src_text)
-prev = {}
-if old:  # 손으로 고친 순서·캡션 유지
-    for i, mm in enumerate(re.finditer(r"\{ f: '([^']+)'(.*?)\}", old.group(0))):
-        cap = re.search(r"cap: '((?:[^'\\]|\\.)*)'", mm.group(2))
-        prev[mm.group(1)] = (i, cap.group(1) if cap else None)
-    items.sort(key=lambda it: prev.get(it['f'], (10 ** 6, None))[0])
+# ── photos.js 쓰기 (사진 한 장 = 한 줄) ──
+def j(o):
+    return json.dumps(o, ensure_ascii=False, separators=(', ', ': '))
 
 
-def js_item(it):
-    parts = [f"f: '{it['f']}'", f"w: {it['w']}", f"h: {it['h']}"]
-    for k in ('iso', 'fn', 'mm'):
-        if k in it: parts.append(f'{k}: {it[k]:g}' if isinstance(it[k], float) else f'{k}: {it[k]}')
-    if 'ss' in it: parts.append(f"ss: '{it['ss']}'")
-    parts.append(f"c: '{it['c']}'")
-    cap = prev.get(it['f'], (0, None))[1]
-    if cap: parts.append(f"cap: '{cap}'")
-    return '      { ' + ', '.join(parts) + ' },'
-
-
-if not wx and old:  # 못 가져오면 이전 값 유지
-    pw = re.search(r'wx: (\{.*?\}),', old.group(0))
-    wx_js = pw.group(1) if pw else 'null'
-else:
-    wx_js = json.dumps(wx, ensure_ascii=False) if wx else 'null'
-block = (f"{start}\n    {{ id: '{BATCH}', label: '{LABEL}', date: '{date}',\n      wx: {wx_js},\n      items: [\n"
-         + '\n'.join(js_item(it) for it in items) + f"\n    ]}},\n    {end}")
-
-if not src_text:
-    src_text = """/* ── 관측 사진 데이터 ─────────────────────────────────────────────
-   scripts/add-photos.py 가 회차 블록을 만들어 줍니다 (손으로 순서·cap 수정 가능).
-   URL: base + <회차id>/<f>.avif (원본 해상도) / <f>-t.avif (그리드용)
-   회차 필드: wx 그날 바깥 날씨 (at 시각, t 기온, rh 습도, ws 풍속 m/s, wd 풍향, sky 하늘)
-   항목 필드: f 파일이름, w/h 픽셀, iso, ss 셔터, fn 조리개, mm 화각, c 빛의 색, cap 캡션(선택)
-   sort: 'desc' 최신 회차가 위 | 'asc'                                    */
-window.PHOTOS = {
-  base: 'https://pub-941aaefa2376456bbc0093aa25af3344.r2.dev/photos/',
-  sort: 'desc',
-  batches: [
-    /* @batches */
-  ],
-};
-"""
-if old:
-    src_text = block_re.sub(lambda _: block, src_text)
-else:
-    src_text = src_text.replace('    /* @batches */', '    ' + block + '\n    /* @batches */')
-MANIFEST.write_text(src_text)
-print(f'▸ photos.js: 회차 {BATCH} ({len(items)}장, {date})')
+out = ['{', f'  "base": {j(data["base"])},', '  "tags": [']
+for ti, t in enumerate(data['tags']):
+    out.append('    {')
+    for k in ('id', 'label', 'href'):
+        out.append(f'      "{k}": {j(t.get(k, ""))},')
+    out.append('      "days": [')
+    out += [f'        {j(d)}' + (',' if i < len(t['days']) - 1 else '') for i, d in enumerate(t['days'])]
+    out.append('      ],')
+    out.append('      "items": [')
+    out += [f'        {j(x)}' + (',' if i < len(t['items']) - 1 else '') for i, x in enumerate(t['items'])]
+    out.append('      ]')
+    out.append('    }' + (',' if ti < len(data['tags']) - 1 else ''))
+out += ['  ]', '}']
+MANIFEST.write_text(HEADER + '\n'.join(out) + ';\n')
+print(f'▸ photos.js: {tag["label"]} — {len(tag["items"])}장 ({", ".join(d["date"] for d in tag["days"])})')
 print('✓ 완료 — git add photos.js 후 커밋하면 반영됩니다.'
-      + ('  (업로드 안 함: --no-upload)' if NO_UPLOAD else ''))
+      + ('  (업로드 안 함: --no-upload)' if A.no_upload else ''))

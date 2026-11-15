@@ -8,6 +8,7 @@
    정렬은 sort 하나로 바꿉니다: 'asc'(공개 순서, 기본) | 'desc'
    등록된 항목 수만큼만 표시됩니다 (빈칸/예정칸 없음).                    */
 window.REELS = {
+  tag: 'microclimate-2026',          // 기본 태그 (관측 페이지에서 묶는 단위). 항목별로 tag: '...' 로 바꿀 수 있음
   base: 'https://pub-941aaefa2376456bbc0093aa25af3344.r2.dev/reels/',
   sort: 'desc',
   items: [

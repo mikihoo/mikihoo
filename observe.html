@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관측 — mikihoo</title>
+  <meta name="description" content="공연이 있던 날의 빛과 바깥 날씨를 함께 남겨둔 사진과 영상." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="forecast-config.js"></script>
+  <script src="analytics.js"></script>
+</head>
+<body>
+
+  <header class="site-header">
+    <a href="index.html" class="site-title">mikihoo / 微氣候</a>
+    <nav class="site-nav">
+      <a href="index.html">수기록</a>
+      <a href="weather.html">당신의 날씨</a>
+      <a href="sound.html">채음</a>
+      <a href="artists.html">채집자</a>
+    </nav>
+  </header>
+
+  <main class="obs-page">
+    <div class="obs-intro">
+      <div>
+        <div class="forecast-label">관측 / 觀測</div>
+        <p class="obs-lede">공연이 있던 날의 빛과 바깥 날씨를 함께 남겨둡니다.</p>
+      </div>
+      <div class="obs-tags" id="obsTags" role="group" aria-label="태그"></div>
+    </div>
+
+    <div class="obs-photos" id="obsPhotos" aria-label="관측 기록"></div>
+  </main>
+
+  <footer class="site-footer">
+    <span>mikihoo &copy; 2026</span>
+  </footer>
+
+  <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
+  <script src="lenis-init.js"></script>
+  <script src="photos.js"></script>
+  <script src="photos-gallery.js"></script>
+  <script src="reels.js"></script>
+  <script src="reels-player.js"></script>
+  <script src="grain.js"></script>
+  <script src="header-particles.js"></script>
+</body>
+</html>
