@@ -1530,3 +1530,178 @@ a { color: inherit; text-decoration: none; }
     border-radius: 999px;
   }
 }
+
+/* ── 관측 사진 (obs-photos) ─────────────────────────────────────── */
+.obs-photos {
+  border-top: 1px solid var(--border);
+  padding: 3rem 2.8rem 5rem;
+  --rh: clamp(190px, 17vw, 280px);   /* 행 기준 높이 — 사진 비율대로 한 줄을 꽉 채움 */
+}
+.obs-photos .forecast-label { margin-bottom: 1.6rem; }
+
+.obs-batch + .obs-batch { margin-top: 4rem; }
+.obs-batch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-family: 'EB Garamond', 'Noto Serif KR', serif;
+}
+.obs-batch-title { font-size: 0.85rem; color: var(--text-title); letter-spacing: 0.04em; }
+.obs-batch-meta {
+  font-size: 0.68rem; font-style: italic; letter-spacing: 0.06em;
+  color: var(--text-faint); font-variant-numeric: tabular-nums;
+}
+
+/* 그날의 기후: 밖(실제 날씨) / 안(사진들 조도 범위) */
+.obs-climate {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem 1.4rem;
+  font-family: 'EB Garamond', 'Noto Serif KR', serif;
+  font-size: 0.66rem; font-style: italic; letter-spacing: 0.06em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.8rem;
+}
+
+/* 관측 띠 — 사진마다 '빛의 색' 한 줄 (warming stripes 처럼) */
+.obs-stripes { display: flex; height: 14px; margin-bottom: 0.9rem; cursor: pointer; }
+.obs-stripes i {
+  flex: 1 1 0;
+  background: var(--c);
+  transition: flex-grow 0.5s cubic-bezier(.2,.7,.2,1), opacity 0.4s ease;
+}
+.obs-stripes:hover i { opacity: 0.45; }
+.obs-stripes i.hl { flex-grow: 4; opacity: 1; }
+
+/* 저스티파이드 그리드: 비율(--ar)만큼 늘어나서 각 줄을 채움, 마지막 줄은 obs-fill이 흡수 */
+.obs-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.obs-fill { flex: 999 1 0; height: 0; }
+.obs-ph {
+  position: relative;
+  flex: var(--ar) 1 calc(var(--ar) * var(--rh));
+  aspect-ratio: var(--ar);
+  max-height: calc(var(--rh) * 1.6);
+  padding: 0; border: 0; margin: 0;
+  background: color-mix(in srgb, var(--c, #333) 22%, #121210);   /* 로딩 전엔 그 사진의 빛의 색 */
+  overflow: hidden;
+  cursor: zoom-in;
+  font: inherit; color: inherit;
+}
+.obs-ph img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  filter: blur(18px);                 /* 안개 → 걷힘 (로딩 연출일 뿐, 다 뜨면 원본 그대로) */
+  transform: scale(1.06);
+  transition: opacity 1s ease, filter 1.6s cubic-bezier(.2,.7,.2,1), transform 1.6s cubic-bezier(.2,.7,.2,1);
+}
+.obs-ph img.in { opacity: 1; filter: none; transform: none; }
+.obs-ph:hover img.in { transform: scale(1.015); }
+.obs-grid.dim .obs-ph:not(.hl) img.in { opacity: 0.35; transition-duration: 0.4s; }
+.obs-ph:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+/* 노출 데이터 — 관측 기록계처럼 사진 위에 얹힘 */
+.obs-ph-data {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 1.6rem 0.8rem 0.6rem;
+  background: linear-gradient(to top, rgba(8,8,7,0.72), rgba(8,8,7,0));
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
+}
+.obs-ph-no { color: var(--text-dim); margin-right: 0.9em; font-style: normal; }
+.obs-ph:hover .obs-ph-data,
+.obs-ph:focus-visible .obs-ph-data { opacity: 1; transform: none; }
+
+/* 라이트박스 */
+.obs-lb {
+  display: none;
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(10, 10, 9, 0.97);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3.2rem 2rem;
+}
+.obs-lb.open { display: flex; }
+.obs-lb::before {                     /* 사진의 빛이 화면 밖으로 번지는 느낌 */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 55% at 50% 50%, color-mix(in srgb, var(--c, #333) 16%, transparent), transparent 75%);
+  transition: background 0.6s ease;
+}
+.obs-lb-stage {
+  position: relative;
+  aspect-ratio: var(--ar, 1.5);
+  height: min(calc(100vh - 7.4rem), calc((100vw - 4rem) / var(--ar, 1.5)));
+  max-width: 100%;
+  transition: transform 0.25s ease, opacity 0.14s ease;
+}
+.obs-lb-stage.swap { opacity: 0; }
+.obs-lb-stage img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none; -webkit-user-drag: none;
+}
+.obs-lb-thumb { filter: blur(10px); }   /* 원본 오기 전 안개 */
+.obs-lb-full { opacity: 0; transition: opacity 0.6s ease; }
+.obs-lb-full.in { opacity: 1; }
+.obs-lb-nav {
+  position: absolute; top: 0; bottom: 0; width: 50%;
+  background: none; border: 0; padding: 0;
+}
+.obs-lb-nav.prev { left: 0;  cursor: w-resize; }
+.obs-lb-nav.next { right: 0; cursor: e-resize; }
+
+.obs-lb-top, .obs-lb-bottom {
+  position: absolute; left: 1.8rem; right: 1.8rem;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  font-family: 'EB Garamond', 'Noto Serif KR', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.obs-lb-top { top: 1.55rem; padding-right: 4rem; }
+.obs-lb-bottom { bottom: 1.3rem; }
+.obs-lb-label { font-style: italic; }
+.obs-lb-count { color: var(--text-dim); }
+.obs-lb-data { font-style: italic; text-align: right; }
+
+@media (max-width: 768px) {
+  .obs-photos { padding: 2rem 1.4rem 3.5rem; --rh: 104px; }
+  .obs-grid { gap: 4px; }
+  .obs-batch-head { flex-direction: column; gap: 0.25rem; }
+  .obs-ph-data { display: none; }                /* 모바일: 데이터는 라이트박스에서 */
+  .obs-lb { padding: 0; }
+  .obs-lb-stage { height: min(100vh, calc(100vw / var(--ar, 1.5))); }
+  .obs-lb-nav { display: none; }                 /* 모바일은 스와이프 */
+  .obs-lb-top { top: calc(1.2rem + env(safe-area-inset-top, 0px)); left: 1.1rem; padding-right: 6rem; }
+  .obs-lb-bottom {
+    left: 1.1rem; right: 1.1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    flex-direction: column; gap: 0.2rem;
+  }
+  .obs-lb-data { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obs-ph img, .obs-lb-stage, .obs-lb-full, .obs-ph-data, .obs-stripes i { transition: none; }
+  .obs-ph img { filter: none; transform: none; }
+}

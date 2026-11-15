@@ -19,3 +19,7 @@ video/
 
 # R2 인증 파일 (비밀)
 certification/
+
+# 관측 사진 원본 + 변환본 — R2로만 올리고 저장소엔 photos.js만
+관측 사진/
+photos/processed/
