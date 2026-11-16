@@ -1772,3 +1772,6 @@ a { color: inherit; text-decoration: none; }
   .obs-ph.obs-pv { height: 150px; }
   .obs-batch-head .obs-link { align-self: flex-start; }
 }
+
+/* 모바일 스와이프 탭 이동 — 떠날 때 살짝 페이드 */
+body.swipe-leaving { opacity: 0; transition: opacity 0.16s ease; }
