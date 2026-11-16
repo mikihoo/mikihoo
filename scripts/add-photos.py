@@ -17,6 +17,7 @@
   --venue 무대륙          관측 장소 이름 (기본 무대륙)
   --lat/--lon            장소 좌표 (기본 무대륙) — 그날 바깥 날씨용
   --time 18:00           그날 바깥 날씨를 기록할 시각 (기본 18:00, 공연 시작)
+  --who suheeson         이 폴더 사진이 누구의 사진인지 (사람별 필터). 사람이 아닌 사진은 --who 사이
   --no-upload            R2 업로드 생략
 
 결과물:
@@ -44,6 +45,7 @@ ap.add_argument('--venue', default='무대륙')
 ap.add_argument('--lat', type=float, default=37.5486)   # 무대륙 (마포 토정로5길)
 ap.add_argument('--lon', type=float, default=126.9204)
 ap.add_argument('--time', default='18:00')
+ap.add_argument('--who', help='사람 이름 (사람별 필터), 사람 아닌 사진은 사이')
 ap.add_argument('--no-upload', action='store_true')
 A = ap.parse_args()
 SRC, TAG = Path(A.src), A.tag
@@ -58,7 +60,8 @@ HEADER = """/* ── 관측 사진 데이터 — scripts/add-photos.py 가 갱�
    tags: 위에 있을수록 최근. 태그 하나 = 사진 묶음 (예: 2026 미기후)
      href  태그에서 이어지는 페이지 (미기후 페이지 등)
      days  날짜별 장소·바깥 날씨 (wx: at 시각, t 기온, rh 습도, ws 풍속 m/s, wd 풍향, sky 하늘)
-     items 사진 (f 파일, d 날짜, w/h 픽셀, iso, ss 셔터, fn 조리개, mm 화각, c 빛의 색, cap 캡션)
+     people 사람 순서 (사람별 필터 · 사이 = 사람 아닌 사진: 공간·악기·관객)
+     items 사진 (f 파일, d 날짜, w/h 픽셀, iso, ss 셔터, fn 조리개, mm 화각, c 빛의 색, who 사람, cap 캡션)
    순서·cap 은 손으로 고쳐도 됨 (JSON 형식 — 큰따옴표 유지).
    URL: base + <태그id>/<f>.avif (원본) / <f>-t.avif (그리드용)                */
 window.PHOTOS = """
@@ -182,14 +185,29 @@ for p in files:
     if m.get('FocalLength'): it['mm'] = round(m['FocalLength'])
     it['c'] = light_color(p)
     if prev.get(stem, {}).get('cap'): it['cap'] = prev[stem]['cap']
+    who = A.who or prev.get(stem, {}).get('who')
+    if who: it['who'] = who
     if stem in prev:
         prev[stem].clear(); prev[stem].update(it)          # 기존 자리 유지
     else:
         new_items.append(it)
     print(f'  {stem}  {full.stat().st_size // 1024}KB / thumb {thumb.stat().st_size // 1024}KB')
 
-# 새 사진은 붙이고, 날짜 최신순으로 (같은 날짜 안에서는 기존/손으로 고친 순서 유지)
-tag['items'] = sorted(tag['items'] + new_items, key=lambda x: x.get('d', ''), reverse=True)
+# 사람 순서 (people) — 처음 나온 순서대로, 사이(사람 아닌 사진)는 늘 맨 뒤. 손으로 바꿔도 유지됨
+if A.who:
+    people = tag.setdefault('people', [])
+    if A.who not in people:
+        people.append(A.who)
+    if '사이' in people:
+        people.remove('사이'); people.append('사이')
+
+# 새 사진은 붙이고, 날짜 최신순 → 사람 순서 → 파일명 (사람이 없는 태그는 기존/손으로 고친 순서 유지)
+order = {w: i for i, w in enumerate(tag.get('people', []))}
+tag['items'] = tag['items'] + new_items
+tag['items'].sort(key=lambda x: x.get('d', ''), reverse=True)                     # 안정 정렬
+if order:
+    tag['items'].sort(key=lambda x: (-int(x.get('d', '').replace('.', '') or 0),
+                                     order.get(x.get('who'), len(order)), x['f']))
 
 # 날짜별 장소·바깥 날씨
 for d in sorted({exif_date[p.name] or fallback for p in files} - {''}):
@@ -227,6 +245,8 @@ for ti, t in enumerate(data['tags']):
     out.append('    {')
     for k in ('id', 'label', 'href'):
         out.append(f'      "{k}": {j(t.get(k, ""))},')
+    if t.get('people'):
+        out.append(f'      "people": {j(t["people"])},')
     out.append('      "days": [')
     out += [f'        {j(d)}' + (',' if i < len(t['days']) - 1 else '') for i, d in enumerate(t['days'])]
     out.append('      ],')

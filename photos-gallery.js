@@ -2,7 +2,8 @@
    데이터: photos.js (scripts/add-photos.py 가 생성)
    · 관측 페이지  #obsPhotos            태그별 섹션(영상 + 관측 띠 + 사진) · 태그 필터 · 라이트박스
    · 미기후 페이지 #obsPreview[data-tag] 관측 띠 + 미리보기 줄 → 관측 페이지로 연결
-   주소: observe.html?tag=<태그id>&p=<사진 f>  (태그 필터 / 사진 바로 열기)
+   주소: observe.html?tag=<태그id>&who=<사람>&p=<사진 f>  (태그 필터 / 사람 필터 / 사진 바로 열기)
+   사람 필터: 태그에 people 이 있으면 사진 위에 사람별 칩 (사이 = 사람 아닌 사진)
    로컬 미리보기: ?photos=local → photos/processed/ 에서 읽음                          */
 (function () {
   'use strict';
@@ -63,7 +64,7 @@
   }
   function stripes(t, keyOf) {
     return '<div class="obs-stripes" aria-hidden="true">' + t.items.map(function (it, i) {
-      return '<i data-k="' + keyOf(i) + '" style="--c:' + (it.c || '#333') + '"></i>';
+      return '<i data-k="' + keyOf(i) + '"' + (it.who ? ' data-who="' + esc(it.who) + '"' : '') + ' style="--c:' + (it.c || '#333') + '"></i>';
     }).join('') + '</div>';
   }
   function fog(scope) {
@@ -93,7 +94,22 @@
       var html = '<div class="forecast-label">관측 사진 / 觀測寫眞</div>' +
         stripes(pt, function (i) { return i; }) +
         '<div class="obs-pv-row">';
-      pt.items.slice(0, N).forEach(function (it, i) {
+      // 사람이 나뉜 태그면 사람마다 고르게 (공연 순서대로 돌아가며)
+      var pick = pt.items.slice(0, N);
+      if (pt.people && pt.people.length) {
+        var by = {}; pt.items.forEach(function (it) { (by[it.who] = by[it.who] || []).push(it); });
+        var ppl = pt.people.filter(function (w) { return w !== '사이' && by[w]; });
+        pick = [];
+        for (var r = 0; pick.length < N && r < pt.items.length; r++) {
+          ppl.forEach(function (w) {
+            var L = by[w], it = L[Math.floor((r + 0.5) * L.length / Math.ceil(N / ppl.length)) ];
+            if (pick.length < N && it && pick.indexOf(it) < 0) pick.push(it);
+          });
+          if (r >= Math.ceil(N / ppl.length)) break;
+        }
+      }
+      pick.forEach(function (it) {
+        var i = pt.items.indexOf(it);
         html += '<a class="obs-ph obs-pv" data-k="' + i + '" href="' + observeUrl(pt, it) + '" style="--ar:' + (it.w / it.h).toFixed(4) + ';--c:' + (it.c || '#333') + '">' +
                   '<img class="obs-fog" loading="lazy" decoding="async" alt="" src="' + thumbUrl(pt, it) + '" /></a>';
       });
@@ -109,6 +125,16 @@
   if (!full) return;
 
   /* ── 관측 페이지: 태그별 섹션 ─────────────────────────────── */
+  function whoChips(t) {
+    if (!t.people || !t.people.length) return '';
+    var n = {};
+    t.items.forEach(function (it) { if (it.who) n[it.who] = (n[it.who] || 0) + 1; });
+    return '<div class="obs-who" role="group" aria-label="사람">' +
+      '<button type="button" data-who="">모두</button>' +
+      t.people.filter(function (w) { return n[w]; }).map(function (w) {
+        return '<button type="button" data-who="' + esc(w) + '">' + esc(w) + '<sup>' + n[w] + '</sup></button>';
+      }).join('') + '</div>';
+  }
   var flat = [];             // 라이트박스 순회용 (보이는 태그만)
   var html2 = '';
   P.tags.forEach(function (t) {
@@ -127,12 +153,13 @@
       '</div>' +
       '<div class="obs-sub" data-reels-wrap><div class="obs-sub-label">영상</div>' +
         '<div class="reel-strip" data-reels="' + esc(t.id) + '"></div></div>' +
-      '<div class="obs-sub"><div class="obs-sub-label">사진 — ' + t.items.length + '</div>' +
+      '<div class="obs-sub"><div class="obs-sub-label">사진 — <span class="obs-count">' + t.items.length + '</span></div>' +
+        whoChips(t) +
         stripes(t, function (i) { return start + i; }) +
         '<div class="obs-grid">';
     t.items.forEach(function (it, i) {
       var ar = (it.w && it.h) ? it.w / it.h : 1.5;
-      html2 += '<button type="button" class="obs-ph" data-k="' + (start + i) + '" style="--ar:' + ar.toFixed(4) + ';--c:' + (it.c || '#333') + '"' +
+      html2 += '<button type="button" class="obs-ph" data-k="' + (start + i) + '"' + (it.who ? ' data-who="' + esc(it.who) + '"' : '') + ' style="--ar:' + ar.toFixed(4) + ';--c:' + (it.c || '#333') + '"' +
                 ' aria-label="' + esc(t.label + ' ' + pad(i + 1)) + '">' +
                 '<img class="obs-fog" loading="lazy" decoding="async" alt="" width="' + it.w + '" height="' + it.h + '" src="' + thumbUrl(t, it) + '" />' +
                 '<span class="obs-ph-data"><span class="obs-ph-no">' + pad(i + 1) + '</span>' + esc(readout(it)) + '</span>' +
@@ -152,8 +179,7 @@
     full.querySelectorAll('.obs-tag').forEach(function (s) { s.hidden = !!id && s.dataset.tag !== id; });
     if (chipsEl) chipsEl.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b.dataset.tag === id); });
     if (push) {
-      var u = 'observe.html' + (id ? '?tag=' + encodeURIComponent(id) + keep : (local ? '?photos=local' : ''));
-      history.replaceState(null, '', u);
+      syncUrl();
     }
   }
   if (chipsEl) {
@@ -166,6 +192,37 @@
     });
   }
   applyTag(activeTag, false);
+
+  // ── 사람 필터 (태그마다 따로) ──
+  var whoBy = {};
+  function syncUrl() {
+    var w = activeTag && whoBy[activeTag];
+    var u = 'observe.html' + (activeTag ? '?tag=' + encodeURIComponent(activeTag) + (w ? '&who=' + encodeURIComponent(w) : '') + keep
+                                        : (local ? '?photos=local' : ''));
+    history.replaceState(null, '', u);
+  }
+  function applyWho(sec, w, push) {
+    var id = sec.dataset.tag, n = 0;
+    whoBy[id] = w;
+    sec.querySelectorAll('.obs-ph, .obs-stripes i').forEach(function (el) {
+      el.hidden = !!w && el.dataset.who !== w;
+      if (!el.hidden && el.classList.contains('obs-ph')) n++;
+    });
+    sec.querySelectorAll('.obs-who button').forEach(function (b) { b.classList.toggle('active', b.dataset.who === w); });
+    var c = sec.querySelector('.obs-count'); if (c) c.textContent = n;
+    if (push) syncUrl();
+  }
+  var qWho = qs.get('who') || '';
+  full.querySelectorAll('.obs-tag').forEach(function (sec) {
+    var bar = sec.querySelector('.obs-who');
+    if (!bar) return;
+    var ok = qWho && sec.dataset.tag === activeTag && bar.querySelector('button[data-who="' + qWho.replace(/"/g, '') + '"]');
+    applyWho(sec, ok ? qWho : '', false);
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (b) applyWho(sec, b.dataset.who, true);
+    });
+  });
 
   // ── 라이트박스 ──
   var lb = document.createElement('div');
@@ -198,7 +255,9 @@
   // 보이는(필터된) 사진들 안에서만 순회
   function visibleKeys() {
     var ks = [];
-    flat.forEach(function (e, k) { if (!activeTag || e.t.id === activeTag) ks.push(k); });
+    flat.forEach(function (e, k) {
+      if ((!activeTag || e.t.id === activeTag) && (!whoBy[e.t.id] || e.it.who === whoBy[e.t.id])) ks.push(k);
+    });
     return ks;
   }
   function step(k, dir) {
@@ -226,10 +285,11 @@
     var u = fullUrl(e.t, e.it);
     imgF.onload = function () { if (imgF.getAttribute('src') === u) imgF.classList.add('in'); };
     imgF.src = u;
-    elLab.textContent = e.t.label + (e.it.d ? ' — ' + e.it.d : '') + (day && day.venue ? ' · ' + day.venue : '') + (e.it.cap ? '  ·  ' + e.it.cap : '');
+    elLab.textContent = e.t.label + (e.it.who && e.it.who !== '사이' ? ' — ' + e.it.who : '') + (e.it.d ? ' — ' + e.it.d : '') + (day && day.venue ? ' · ' + day.venue : '') + (e.it.cap ? '  ·  ' + e.it.cap : '');
     if (e.t.href) { elLink.href = e.t.href; elLink.textContent = e.t.label.replace(/^\d{4}\s*/, '') + ' 페이지 →'; elLink.hidden = false; }
     else elLink.hidden = true;
-    elCnt.textContent = pad(e.n) + ' / ' + pad(e.total);
+    var vis = visibleKeys().filter(function (k) { return flat[k].t === e.t; });
+    elCnt.textContent = pad(vis.indexOf(cur) + 1) + ' / ' + pad(vis.length);
     elData.textContent = readout(e.it);
     warm(step(cur, 1)); warm(step(cur, -1));
     if (window.mkTrack) window.mkTrack('photo/' + e.t.id + '/' + e.it.f, '📷 ' + e.t.label + ' ' + pad(e.n));
@@ -318,7 +378,8 @@
   var pf = qs.get('p');
   if (pf) {
     var k = -1;
-    flat.forEach(function (e, i) { if (k < 0 && e.it.f === pf && (!activeTag || e.t.id === activeTag)) k = i; });
+    var vk = visibleKeys();
+    flat.forEach(function (e, i) { if (k < 0 && e.it.f === pf && vk.indexOf(i) >= 0) k = i; });
     if (k >= 0) {
       var ph = full.querySelector('.obs-ph[data-k="' + k + '"]');
       if (ph) ph.scrollIntoView({ block: 'center' });
