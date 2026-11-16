@@ -4,14 +4,14 @@
      dday   (11.14)  : 예매 마감 + 당일 안내
      after  (11.15~) : 미기후 — 탭 이름 '미기후', 맨 뒤로 이동, 예매/안내 숨김
    다음 공연이 잡히면 event/lineup 을 새 공연으로 바꾸면 다시 '예보' 탭으로 살아납니다.
-   관측 탭(observe.html)은 항상 맨 뒤에 붙습니다.
+   관측 탭(observe.html)은 항상 예보/미기후 탭 바로 뒤에 붙습니다.
    미리보기: forecast.html?phase=dday  /  ?phase=after                        */
 (function () {
   'use strict';
 
   var FC = {
     nav:      { label: '예보', position: 0 },      // position 0 = 맨 앞 / 99 = 맨 뒤
-    navAfter: { label: '미기후', position: 99 },   // 공연 다음 날부터
+    navAfter: { label: '미기후', position: 1 },    // 공연 다음 날부터 (수기록 다음)
     href: 'forecast.html',
 
     event: {
@@ -83,13 +83,13 @@
       if (pos >= kids.length) nav.appendChild(a);
       else nav.insertBefore(a, kids[pos]);
 
-      // 관측 탭 (사진·영상 아카이브) — 항상 맨 뒤
+      // 관측 탭 (사진·영상 아카이브) — 예보/미기후 탭 바로 뒤
       var o = document.createElement('a');
       o.href = 'observe.html';
       o.textContent = '관측';
       o.setAttribute('data-observe-nav', '');
       if (/observe\.html$/.test(location.pathname)) o.classList.add('active');
-      nav.appendChild(o);
+      nav.insertBefore(o, a.nextSibling);
     });
   }
 
